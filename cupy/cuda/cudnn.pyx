@@ -54,6 +54,8 @@ cdef extern from "cupy_cudnn.h" nogil:
     ctypedef int SoftmaxAlgorithm 'cudnnSoftmaxAlgorithm_t'
     ctypedef int SoftmaxMode 'cudnnSoftmaxMode_t'
     ctypedef int Status 'cudnnStatus_t'
+    ctypedef int RuntimeTag 'cudnnRuntimeTag_t'
+    ctypedef int ErrQueryMode 'cudnnErrQueryMode_t'
     ctypedef int TensorFormat 'cudnnTensorFormat_t'
 
     ctypedef void* ActivationDescriptor 'cudnnActivationDescriptor_t'
@@ -71,6 +73,8 @@ cdef extern from "cupy_cudnn.h" nogil:
 
     # Error handling
     const char* cudnnGetErrorString(Status status)
+    int cudnnQueryRuntimeError(
+        Handle handle, Status* status, ErrQueryMode mode, RuntimeTag* tag)
 
     # Version
     size_t cudnnGetVersion()
@@ -443,6 +447,10 @@ cdef dict STATUS = {
 }
 
 
+###############################################################################
+# Error handling
+###############################################################################
+
 class CuDNNError(RuntimeError):
 
     def __init__(self, int status):
@@ -456,6 +464,13 @@ cpdef inline check_status(int status):
     if status != 0:
         raise CuDNNError(status)
 
+
+cpdef queryRuntimeError(size_t handle, int mode, size_t tag):
+    cdef Status status, runtimeError
+    status = cudnnQueryRuntimeError(
+        <Handle>handle, &runtimeError, <ErrQueryMode>mode, <RuntimeTag*>tag)
+    check_status(status)
+    return <int>runtimeError
 
 ###############################################################################
 # Version

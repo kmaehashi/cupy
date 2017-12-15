@@ -484,6 +484,18 @@ cudnnStatus_t cudnnSetRNNDescriptor_v6(...) {
 #endif // #if defined(CUPY_NO_CUDA) || (CUDNN_VERSION < 6000)
 
 
+#if defined(CUPY_NO_CUDA) || (CUDNN_VERSION < 7000)
+
+typedef struct cudnnRuntimeTag_t cudnnRuntimeTag_t;
+typedef enum {} cudnnErrQueryMode_t;
+
+cudnnStatus_t cudnnQueryRuntimeError(...) {
+    return CUDNN_STATUS_NOT_SUPPORTED;
+}
+
+#endif // #if defined(CUPY_NO_CUDA) || (CUDNN_VERSION < 7000)
+
+
 #if !defined(CUPY_NO_CUDA) && (CUDNN_VERSION >= 5000)
 // Some functions are renamed in cuDNN v5.
 // Following definitions are for compatibility with cuDNN v5 and higher.
