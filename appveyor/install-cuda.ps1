@@ -68,7 +68,7 @@ function main () {
         cusparse_dev_$CUDA_VERSION
         nvrtc_$CUDA_VERSION
         nvrtc_dev_$CUDA_VERSION
-    "@
+"@
 
     # Download & Install cuDNN
     $filename = "cudnn-${CUDA_VERSION}-windows7-x64-v${CUDNN_VERSION}.zip"
