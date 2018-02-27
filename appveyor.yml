@@ -47,7 +47,7 @@ install:
   - ps: if (-not(Test-Path($env:PYTHON))) { & appveyor\install.ps1 }
 
   # Install CUDA.
-  - ps: & appveyor\install-cuda.ps1
+  - ps: appveyor\install-cuda.ps1
 
   # Prepend newly installed Python to the PATH of this build (this cannot be
   # done from inside the powershell script as it would require to restart
@@ -67,4 +67,5 @@ build_script:
 test_script:
   # Run the project tests
   - "%CMD_IN_ENV% pip install -U -e ."
+  - "%CMD_IN_ENV% pip install flake8"
   - "flake8"
