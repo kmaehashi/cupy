@@ -41,13 +41,13 @@ function Unzip ([string]$zipfile, [string]$outpath) {
 
 function main () {
     # Download & Install CUDA
-    $filename = "cuda_9.1.85_win10.exe"
-    $url = "https://developer.nvidia.com/compute/cuda/9.1/Prod/local_installers/cuda_9.1.85_win10"
+    $filename = "cuda_9.1.85_windows.exe"
+    $url = "https://developer.nvidia.com/compute/cuda/9.1/Prod/local_installers/cuda_9.1.85_windows"
     $filepath = Download $filename $url
     RunCommand $filepath "-s"
 
     # Download & Install cuDNN
-    $filename = "cudnn-9.1-windows10-x64-v7.zip"
+    $filename = "cudnn-9.1-windows7-x64-v7.zip"
     $url = "http://developer.download.nvidia.com/compute/redist/cudnn/v7.0.5/$filename"
     $filepath = Download $filename $url
     Unzip $filepath $pwd.Path

@@ -42,7 +42,8 @@ environment:
       PYTHON_ARCH: "64"
 
 cache:
-  - "cuda_9.1.85_win10.exe"
+  - "cuda_*_windows.exe"
+  - "cudnn-*.zip"
 
 install:
   - ECHO "Filesystem root:"
@@ -56,7 +57,7 @@ install:
   - ps: if (-not(Test-Path($env:PYTHON))) { & appveyor\install.ps1 }
 
   # Install CUDA.
-  - "call appveyor\\cuda-install.cmd"
+  #- "call appveyor\\cuda-install.cmd"
   - ps: appveyor\install-cuda.ps1
   - ps: ls -r "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
   - "set CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
