@@ -50,7 +50,7 @@ function main () {
     $filename = "cuda_${CUDA_RELEASE}_windows.exe"
     $url = "https://developer.nvidia.com/compute/cuda/${CUDA_VERSION}/Prod/local_installers/cuda_${CUDA_RELEASE}_windows"
     $filepath = Download $filename $url
-    RunCommand $filepath -s
+    RunCommand $filepath "-s"
     $opts = @"
         -s
         Display.Driver
