@@ -24,10 +24,12 @@ environment:
     - PYTHON: "C:\\Miniconda-x64"
       PYTHON_VERSION: "2.7.x"
       PYTHON_ARCH: "64"
+      MSVC_VERSION: "Visual Studio 10 Win64"
 
     - PYTHON: "C:\\Miniconda35-x64"
       PYTHON_VERSION: "3.5.x"
       PYTHON_ARCH: "64"
+      MSVC_VERSION: "Visual Studio 10 Win64"
 
 install:
   - ECHO "Filesystem root:"
@@ -47,7 +49,7 @@ install:
   - "SET PATH=%CUDA_PATH%\\bin;%NVTOOLSEXT_PATH%\\bin\\x64;%PATH%"
 
   # Prepare `stdint.h` required by CUDA headers (workaround only needed for Python 2.7)
-  - copy "%ProgramFiles%\\Microsoft Visual Studio 10.0\\VC\\include\\stdint.h" "%LOCALAPPDATA%\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0\\VC\\include\\stdint.h"
+  #- copy "%ProgramFiles%\\Microsoft Visual Studio 10.0\\VC\\include\\stdint.h" "%LOCALAPPDATA%\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0\\VC\\include\\stdint.h"
 
   # Prepend newly installed Python to the PATH of this build (this cannot be
   # done from inside the powershell script as it would require to restart
