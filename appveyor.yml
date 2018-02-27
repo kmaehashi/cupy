@@ -56,7 +56,6 @@ install:
   - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
 
   - "conda install -y -q setuptools"
-  - "conda install -y -q h5py"
 
 build_script:
   # Build the compiled extension
@@ -64,9 +63,5 @@ build_script:
 
 test_script:
   # Run the project tests
-  - "%CMD_IN_ENV% pip install -U -e .[appveyor]"
+  - "%CMD_IN_ENV% pip install -U -e ."
   - "flake8"
-  # Avoid interuption confirmation of cmd.exe
-  - "echo SET CHAINER_TEST_GPU_LIMIT=0 > tmp.bat"
-  - "echo python -m pytest --timeout=60 -m \"not cudnn and not ideep and not slow\" tests >> tmp.bat"
-  - "call tmp.bat < nul"
