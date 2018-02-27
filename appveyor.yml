@@ -63,7 +63,8 @@ install:
   # Install CUDA.
   #- "call appveyor\\cuda-install.cmd"
   - ps: appveyor\install-cuda.ps1
-  - ps: ls -r "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
+  #- ps: ls -r "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
+  - ps: ls -r "C:\\Program Files\\NVIDIA Corporation\\NvToolsExt"
   - "set CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
   - "set NVTOOLSEXT_PATH=C:\\Program Files\\NVIDIA Corporation\\NvToolsExt"
   - "set PATH=%CUDA_PATH%\\bin;%PATH%"
@@ -78,6 +79,8 @@ install:
   - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
 
   - "conda install -y -q setuptools"
+  - "%CMD_IN_ENV% pip install Cython"
+  - "%CMD_IN_ENV% pip install flake8"
 
 build_script:
   # Build the compiled extension
@@ -86,5 +89,4 @@ build_script:
 test_script:
   # Run the project tests
   - "%CMD_IN_ENV% pip install -U -e ."
-  - "%CMD_IN_ENV% pip install flake8"
   - "flake8"
