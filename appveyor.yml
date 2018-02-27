@@ -46,8 +46,8 @@ install:
   - "SET NVTOOLSEXT_PATH=%ProgramFiles%\\NVIDIA Corporation\\NvToolsExt"
   - "SET PATH=%CUDA_PATH%\\bin;%NVTOOLSEXT_PATH%\\bin\\x64;%PATH%"
 
-  # Prepare `stdint.h` required by CUDA headers (only needed for Python 2.7)
-  - cp "c:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\VC\\include\\stdint.h" "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0\\VC\\include\\stdint.h"
+  # Prepare `stdint.h` required by CUDA headers (workaround only needed for Python 2.7)
+  - copy "%ProgramFiles%\\Microsoft Visual Studio 10.0\\VC\\include\\stdint.h" "%LOCALAPPDATA%\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0\\VC\\include\\stdint.h"
 
   # Prepend newly installed Python to the PATH of this build (this cannot be
   # done from inside the powershell script as it would require to restart
