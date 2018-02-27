@@ -54,6 +54,8 @@ install:
 
   # Install CUDA.
   - ps: appveyor\install-cuda.ps1
+  - ps: ls -r "C:\\Program Files (x86)\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
+  - ps: ls -r "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
   - "set CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
   - "set NVTOOLSEXT_PATH=C:\\Program Files\\NVIDIA Corporation\\NvToolsExt"
   - "set PATH=%CUDA_PATH%\\bin;%PATH%"
