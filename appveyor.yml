@@ -2,7 +2,7 @@ branches:
   # As AppVeyor test is slow, we only run AppVeyor against development and
   # stable branches.
   # To disable AppVeyor against Pull-Requests, disable Pull-Request event
-  # on web-hook configuration in GitHub settings.
+  # in web-hook configuration of GitHub settings.
   only:
     - master
     - v2
