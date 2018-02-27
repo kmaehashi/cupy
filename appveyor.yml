@@ -45,10 +45,6 @@ environment:
       PYTHON_VERSION: "3.5.x"
       PYTHON_ARCH: "64"
 
-cache:
-  - "cuda_9.1.85_windows.exe"
-  - "cudnn-9.1-windows7-x64-v7.zip"
-
 install:
   - ECHO "Filesystem root:"
   - ps: "ls \"C:/\""
