@@ -21,25 +21,9 @@ environment:
     # a later point release.
     # See: https://www.appveyor.com/docs/installed-software#python
 
-    - PYTHON: "C:\\Miniconda"
-      PYTHON_VERSION: "2.7.x"
-      PYTHON_ARCH: "32"
-
     - PYTHON: "C:\\Miniconda-x64"
       PYTHON_VERSION: "2.7.x"
       PYTHON_ARCH: "64"
-
-#    - PYTHON: "C:\\Miniconda3"
-#      PYTHON_VERSION: "3.4.x"
-#      PYTHON_ARCH: "32"
-
-#    - PYTHON: "C:\\Miniconda3-x64"
-#      PYTHON_VERSION: "3.4.x"
-#      PYTHON_ARCH: "64"
-
-    - PYTHON: "C:\\Miniconda35"
-      PYTHON_VERSION: "3.5.x"
-      PYTHON_ARCH: "32"
 
     - PYTHON: "C:\\Miniconda35-x64"
       PYTHON_VERSION: "3.5.x"
@@ -57,13 +41,13 @@ install:
   - ps: if (-not(Test-Path($env:PYTHON))) { & appveyor\install.ps1 }
 
   # Install CUDA.
-  #- "call appveyor\\cuda-install.cmd"
   - ps: appveyor\install-cuda.ps1
-  #- ps: ls -r "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
-  #- ps: ls -r "C:\\Program Files\\NVIDIA Corporation\\NvToolsExt"
   - "SET CUDA_PATH=%ProgramFiles%\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
   - "SET NVTOOLSEXT_PATH=%ProgramFiles%\\NVIDIA Corporation\\NvToolsExt"
   - "SET PATH=%CUDA_PATH%\\bin;%NVTOOLSEXT_PATH%\\bin\\x64;%PATH%"
+
+  # Prepare `stdint.h` required by CUDA headers (only needed for Python 2.7)
+  - cp "c:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\VC\\include\\stdint.h" "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0\\VC\\include\\stdint.h"
 
   # Prepend newly installed Python to the PATH of this build (this cannot be
   # done from inside the powershell script as it would require to restart
@@ -75,8 +59,8 @@ install:
   - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
 
   - "conda install -y -q setuptools"
+  - "%CMD_IN_ENV% pip install -U pip"
   - "%CMD_IN_ENV% pip install Cython"
-  - "%CMD_IN_ENV% pip install flake8"
 
 build_script:
   # Build the compiled extension
@@ -85,4 +69,3 @@ build_script:
 test_script:
   # Run the project tests
   - "%CMD_IN_ENV% pip install -U -e ."
-  - "flake8"
