@@ -8,6 +8,9 @@ branches:
     - v2
     - appveyor
 
+image:
+  - Visual Studio 2015
+
 environment:
   global:
     # SDK v7.0 MSVC Express 2008's SetEnv.cmd script will fail if the
@@ -46,11 +49,13 @@ install:
   #- if "%PYTHON%" == "2.7.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\bin;%PATH%
   #- if "%PYTHON%" == "3.5.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\VC\\bin;%PATH%
   #- call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat"
+
   # Visual Studio 2015 https://www.appveyor.com/docs/lang/cpp/
-  - call "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\SetEnv.cmd" /x64
-  - call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat" x86_amd64
+  # We're using "Visual Studio 2015" image (configured in AppVeyor Web UI)
+  - call "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.0\\Bin\\SetEnv.cmd" /x64
+  - if "%PYTHON%" == "2.7.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat" x86_amd64
+  - if "%PYTHON%" == "3.5.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat" x86_amd64
   - where cl
-  - cl /?
 
   # Install CUDA.
   - ps: appveyor\install-cuda.ps1
