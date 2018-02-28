@@ -51,25 +51,6 @@ function main () {
     $url = "https://developer.nvidia.com/compute/cuda/${CUDA_VERSION}/Prod/local_installers/cuda_${CUDA_RELEASE}_windows"
     $filepath = Download $filename $url
     RunCommand $filepath "-s"
-    $opts = @"
-        -s
-        Display.Driver
-        nvcc_$CUDA_VERSION
-        visual_studio_integration_$CUDA_VERSION
-        cublas_$CUDA_VERSION
-        cublas_dev_$CUDA_VERSION
-        cudart_$CUDA_VERSION
-        cufft_$CUDA_VERSION
-        cufft_dev_$CUDA_VERSION
-        curand_$CUDA_VERSION
-        curand_dev_$CUDA_VERSION
-        cusolver_$CUDA_VERSION
-        cusolver_dev_$CUDA_VERSION
-        cusparse_$CUDA_VERSION
-        cusparse_dev_$CUDA_VERSION
-        nvrtc_$CUDA_VERSION
-        nvrtc_dev_$CUDA_VERSION
-"@
 
     # Download & Install cuDNN
     $filename = "cudnn-${CUDA_VERSION}-windows7-x64-v${CUDNN_VERSION}.zip"

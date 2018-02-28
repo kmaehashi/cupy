@@ -68,5 +68,5 @@ build_script:
   - "%CMD_IN_ENV% python setup.py build install -vvvv"
 
 test_script:
-  # Run the project tests
+  # Installation test
   - "%CMD_IN_ENV% pip install -U -e ."
