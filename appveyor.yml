@@ -43,8 +43,9 @@ install:
   # XXX
   #- tree "%ProgramFiles(x86)%\\Microsoft Visual Studio 9.0"
   #- tree "%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0"
-  - if "%PYTHON%" == "2.7.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\bin;%PATH%
-  - if "%PYTHON%" == "3.5.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\VC\\bin;%PATH%
+  #- if "%PYTHON%" == "2.7.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\bin;%PATH%
+  #- if "%PYTHON%" == "3.5.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\VC\\bin;%PATH%
+  - call "%ProgramFiles(x86)%\Microsoft Visual Studio 14.0\Common7\Tools\VsMSBuildCmd.bat"
   - where cl
   - cl /?
 
