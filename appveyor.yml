@@ -24,12 +24,8 @@ environment:
     # a later point release.
     # See: https://www.appveyor.com/docs/installed-software#python
 
-    - PYTHON: "C:\\Miniconda-x64"
-      PYTHON_VERSION: "2.7.x"
-      PYTHON_ARCH: "64"
-
-    - PYTHON: "C:\\Miniconda35-x64"
-      PYTHON_VERSION: "3.5.x"
+    - PYTHON: "C:\\Python36-x64"
+      PYTHON_VERSION: "3.6.x"
       PYTHON_ARCH: "64"
 
 install:
@@ -43,28 +39,11 @@ install:
   # not already installed.
   - ps: if (-not(Test-Path($env:PYTHON))) { & appveyor\install.ps1 }
 
-  # XXX
-  - tree /F /A "%ProgramFiles(x86)%\\Microsoft Visual Studio 9.0"
-  #- if "%PYTHON%" == "2.7.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\bin;%PATH%
-  #- if "%PYTHON%" == "3.5.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\VC\\bin;%PATH%
-  #- call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat"
-
-  # Visual Studio 2015 https://www.appveyor.com/docs/lang/cpp/
-  #- call "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\SetEnv.cmd" /x64
-  #- if "%PYTHON%" == "2.7.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat" x86_amd64
-  #- if "%PYTHON%" == "3.5.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat" x86_amd64
-  - where cl
-
   # Install CUDA & cuDNN.
   - ps: appveyor\install-cuda.ps1
   - "SET CUDA_PATH=%ProgramFiles%\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
   - "SET NVTOOLSEXT_PATH=%ProgramFiles%\\NVIDIA Corporation\\NvToolsExt"
   - "SET PATH=%CUDA_PATH%\\bin;%NVTOOLSEXT_PATH%\\bin\\x64;%PATH%"
-
-  # Workaround the issue that `stdint.h` is missing on Visual Studio 9.0, which is used by Python 2.7.
-  # AppVeyor environment has Visual Studio 10.0, which comes with `stdint.h`.
-  - copy "%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\include\\stdint.h" "%ProgramFiles(x86)%\\Microsoft Visual Studio 9.0\\VC\\include\\stdint.h"
-  - nvcc test.cu
 
   # Prepend newly installed Python to the PATH of this build (this cannot be
   # done from inside the powershell script as it would require to restart
@@ -75,9 +54,8 @@ install:
   - "python --version"
   - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
 
-  - "conda install -y -q setuptools"
-  - "conda update -y -q pip"
-  - "pip install Cython"
+  - "python -m pip install -U pip"
+  - "pip install -U setuptools"
 
 build_script:
   # Build the compiled extension
