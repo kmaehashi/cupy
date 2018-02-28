@@ -40,6 +40,9 @@ install:
   # not already installed.
   - ps: if (-not(Test-Path($env:PYTHON))) { & appveyor\install.ps1 }
 
+  # XXX
+  - tree "%ProgramFiles%\\Microsoft Visual Studio 9.0"
+
   # Install CUDA.
   - ps: appveyor\install-cuda.ps1
   - "SET CUDA_PATH=%ProgramFiles%\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
