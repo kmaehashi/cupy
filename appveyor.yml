@@ -45,7 +45,7 @@ install:
   #- tree "%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0"
   #- if "%PYTHON%" == "2.7.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\bin;%PATH%
   #- if "%PYTHON%" == "3.5.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\VC\\bin;%PATH%
-  - call "%ProgramFiles(x86)%\Microsoft Visual Studio 14.0\Common7\Tools\VsMSBuildCmd.bat"
+  - call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat"
   - where cl
   - cl /?
 
