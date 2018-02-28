@@ -43,6 +43,10 @@ install:
   # XXX
   #- tree "%ProgramFiles(x86)%\\Microsoft Visual Studio 9.0"
   #- tree "%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0"
+  - if "%PYTHON%" == "2.7.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\bin;%PATH%
+  - if "%PYTHON%" == "3.5.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\VC\\bin;%PATH%
+  - where cl
+  - cl /?
 
   # Install CUDA.
   - ps: appveyor\install-cuda.ps1
@@ -53,8 +57,6 @@ install:
   # Workaround the issue that `stdint.h` is missing on Visual Studio 9.0, which is used by Python 2.7.
   # AppVeyor environment has Visual Studio 10.0, which comes with `stdint.h`.
   - copy "%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\include\\stdint.h" "%ProgramFiles(x86)%\\Microsoft Visual Studio 9.0\\VC\\include\\stdint.h"
-  - if "%PYTHON%" == "2.7.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\bin;%PATH%
-  - if "%PYTHON%" == "3.5.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\VC\\bin;%PATH%
   - nvcc test.cu
 
   # Prepend newly installed Python to the PATH of this build (this cannot be
