@@ -51,8 +51,7 @@ install:
   #- call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat"
 
   # Visual Studio 2015 https://www.appveyor.com/docs/lang/cpp/
-  # We're using "Visual Studio 2015" image (configured in AppVeyor Web UI)
-  - call "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.0\\Bin\\SetEnv.cmd" /x64
+  - call "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\SetEnv.cmd" /x64
   - if "%PYTHON%" == "2.7.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat" x86_amd64
   - if "%PYTHON%" == "3.5.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat" x86_amd64
   - where cl
