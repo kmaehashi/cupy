@@ -44,19 +44,18 @@ install:
   - ps: if (-not(Test-Path($env:PYTHON))) { & appveyor\install.ps1 }
 
   # XXX
-  #- tree "%ProgramFiles(x86)%\\Microsoft Visual Studio 9.0"
-  #- tree "%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0"
+  - tree /F /A "%ProgramFiles(x86)%\\Microsoft Visual Studio 9.0"
   #- if "%PYTHON%" == "2.7.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 10.0\\VC\\bin;%PATH%
   #- if "%PYTHON%" == "3.5.x" set PATH=%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\VC\\bin;%PATH%
   #- call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat"
 
   # Visual Studio 2015 https://www.appveyor.com/docs/lang/cpp/
-  - call "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\SetEnv.cmd" /x64
-  - if "%PYTHON%" == "2.7.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat" x86_amd64
-  - if "%PYTHON%" == "3.5.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat" x86_amd64
+  #- call "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\SetEnv.cmd" /x64
+  #- if "%PYTHON%" == "2.7.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat" x86_amd64
+  #- if "%PYTHON%" == "3.5.x" call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat" x86_amd64
   - where cl
 
-  # Install CUDA.
+  # Install CUDA & cuDNN.
   - ps: appveyor\install-cuda.ps1
   - "SET CUDA_PATH=%ProgramFiles%\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.1"
   - "SET NVTOOLSEXT_PATH=%ProgramFiles%\\NVIDIA Corporation\\NvToolsExt"
@@ -87,3 +86,6 @@ build_script:
 test_script:
   # Installation test
   - "%CMD_IN_ENV% pip install -U -e ."
+  # Import test
+  - python -c "import cupy"
+  - python -c "import cupy.cuda.cudnn"
