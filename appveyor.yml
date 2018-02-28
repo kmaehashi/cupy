@@ -61,8 +61,8 @@ install:
   - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
 
   - "conda install -y -q setuptools"
-  - "%CMD_IN_ENV% pip install -U pip"
-  - "%CMD_IN_ENV% pip install Cython"
+  - "conda update -y -q pip"
+  - "pip install Cython"
 
 build_script:
   # Build the compiled extension
