@@ -66,8 +66,8 @@ test_script:
   # Installation test
   - "%CMD_IN_ENV% pip install -U -e ."
   # Import test
-  - python -c "import cupy"
-  - python -c "import cupy.cuda.nvtx"
-  - python -c "import cupy.cuda.cudnn"
-  - python -c "import cupy.cuda.cusolver"
-  - python -c "import cupy.cuda.thrust"
+  #- python -c "import cupy"
+  #- python -c "import cupy.cuda.nvtx"
+  #- python -c "import cupy.cuda.cudnn"
+  #- python -c "import cupy.cuda.cusolver"
+  #- python -c "import cupy.cuda.thrust"
