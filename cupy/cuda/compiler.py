@@ -1,3 +1,4 @@
+import ctypes
 import hashlib
 import math
 import os
@@ -8,11 +9,26 @@ import tempfile
 
 import six
 
+import cupy.cuda
 from cupy.cuda import device
 from cupy.cuda import function
 from cupy.cuda import nvrtc
 
 _nvrtc_version = None
+_nvrtc_builtins_preload = None
+
+
+def _preload_nvrtc_builtins():
+    global _nvrtc_builtins_preload
+    if _nvrtc_builtins_preload is not None:
+        return
+
+    cuda_path = cupy.cuda.get_cuda_path()
+    if cuda_path is not None:
+        path = os.path.join(cuda_path, 'lib64', 'libnvrtc-builtins.so')
+        _nvrtc_builtins_preload = ctypes.CDLL(path)
+    else:
+        _nvrtc_builtins_preload = False
 
 
 def _get_nvrtc_version():
@@ -209,6 +225,7 @@ class _NVRTCProgram(object):
 
     def __init__(self, src, name="default_program", headers=(),
                  include_names=()):
+        _preload_nvrtc_builtins()
         self.ptr = None
 
         if isinstance(src, six.binary_type):
