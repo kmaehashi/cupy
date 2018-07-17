@@ -61,6 +61,8 @@ cdef extern from "cupy_cuda.h" nogil:
     int cudaDeviceGetAttribute(int* value, DeviceAttr attr, int device)
     int cudaGetDeviceCount(int* count)
     int cudaSetDevice(int device)
+    int cudaSetDeviceFlags(unsigned int flags)
+    int cudaGetDeviceFlags(unsigned int* flags)
     int cudaDeviceSynchronize()
 
     int cudaDeviceCanAccessPeer(int* canAccessPeer, int device,
@@ -180,6 +182,17 @@ cpdef int getDeviceCount() except *:
 
 cpdef setDevice(int device):
     status = cudaSetDevice(device)
+    check_status(status)
+
+
+cpdef unsigned int getDeviceFlags() except *:
+    cdef unsigned int ret
+    status = cudaGetDeviceFlags(&ret)
+    check_status(status)
+    return ret
+
+cpdef setDeviceFlags(unsigned int flags):
+    status = cudaSetDeviceFlags(flags)
     check_status(status)
 
 

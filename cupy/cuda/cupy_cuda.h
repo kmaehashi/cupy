@@ -278,6 +278,10 @@ cudaError_t cudaSetDevice(...) {
     return cudaSuccess;
 }
 
+cudaError_t cudaSetDeviceFlags(...) {
+    return cudaSuccess;
+}
+
 cudaError_t cudaDeviceSynchronize() {
     return cudaSuccess;
 }
