@@ -65,6 +65,11 @@ def main():
     print('')
 
     with cp.cuda.Device(args.gpu):
+        flags = cp.cuda.runtime.getDeviceFlags()
+        #cp.cuda.runtime.setDeviceFlags(flags | 0x00)  # cudaDeviceScheduleAuto
+        #cp.cuda.runtime.setDeviceFlags(flags | 0x01)  # cudaDeviceScheduleSpin
+        #cp.cuda.runtime.setDeviceFlags(flags | 0x02)  # cudaDeviceScheduleYield
+        cp.cuda.runtime.setDeviceFlags(flags | 0x04)  # cudaDeviceScheduleBlockingSync
         A = cp.random.uniform(
             low=-1., high=1., size=(args.m, args.k)).astype(cp.float32)
         B = cp.random.uniform(
