@@ -8,12 +8,12 @@ import tempfile
 
 import six
 
+from cupy import util
 from cupy.cuda import device
 from cupy.cuda import function
 from cupy.cuda import nvrtc
 
 _nvrtc_version = None
-_nvrtc_max_compute_capability = None
 
 
 def _get_nvrtc_version():
@@ -24,19 +24,30 @@ def _get_nvrtc_version():
     return _nvrtc_version
 
 
+@util.memoize(for_each_device=True)
 def _get_arch():
-    global _nvrtc_max_compute_capability
-    if _nvrtc_max_compute_capability is None:
-        # See Supported Compile Options section of NVRTC User Guide for
-        # the maximum value allowed for `--gpu-architecture`.
-        major, minor = _get_nvrtc_version()
-        if major < 9:
-            # CUDA 7.0 / 7.5 / 8.0
-            _nvrtc_max_compute_capability = '50'
-        else:
-            # CUDA 9.0 / 9.1
-            _nvrtc_max_compute_capability = '70'
-    cc = min(device.Device().compute_capability, _nvrtc_max_compute_capability)
+    # See Supported Compile Options section of NVRTC User Guide for
+    # the maximum value allowed for `--gpu-architecture`.
+    # https://docs.nvidia.com/cuda/nvrtc/index.html#group__options
+    major, minor = _get_nvrtc_version()
+    if major < 9:
+        # CUDA 8.0
+        supported_arch = ['20',
+                          '30', '35',
+                          '50', '52', '53']
+        default_arch = '20'
+    else:
+        # CUDA 9.0 / 9.1 / 9.2 / 10.0
+        supported_arch = ['30', '32', '35', '37',
+                          '50', '52', '53',
+                          '60', '61', '62',
+                          '70', '72']
+        default_arch = '30'
+    device_cc = device.Device().compute_capability
+    if device_cc in supported_arch:
+        cc = device_cc
+    else:
+        cc = default_arch
     return 'compute_%s' % cc
 
 
