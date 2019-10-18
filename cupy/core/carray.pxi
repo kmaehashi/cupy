@@ -1,6 +1,6 @@
 import os
 
-from cupy import cuda
+from cupy import _environment
 
 from cupy.cuda cimport function
 from cupy.cuda cimport runtime
@@ -147,7 +147,7 @@ cpdef function.Module compile_with_cache(
             # CUDA v9.0, v9.1 or versions not yet supported.
             bundled_include = None
 
-        cuda_path = cuda.get_cuda_path()
+        cuda_path = _enviornment.get_cuda_path()
 
         if bundled_include is None and cuda_path is None:
             raise RuntimeError(

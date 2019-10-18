@@ -1,4 +1,5 @@
 from __future__ import division
+import os
 import sys
 import warnings
 
@@ -6,6 +7,11 @@ import numpy
 import six
 
 from cupy import _version
+from cupy import _environment
+
+
+if sys.version_info >= (3, 8) and sys.platform.startswith('win32'):
+    _environment._setup_cuda_dll_path()
 
 
 try:
