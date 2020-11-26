@@ -47,7 +47,7 @@ requirements = {
     ],
     'docs': [
         'sphinx==3.0.4',
-        'sphinx_rtd_theme',
+        'pydata_sphinx_theme',
     ],
     'travis': [
         '-r stylecheck',
