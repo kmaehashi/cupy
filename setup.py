@@ -49,10 +49,6 @@ requirements = {
         'sphinx==3.0.4',
         'pydata_sphinx_theme',
     ],
-    'travis': [
-        '-r stylecheck',
-        '-r docs',
-    ],
     'appveyor': [
         '-r test',
     ],
