@@ -282,7 +282,7 @@ cusparseStatus_t cusparseZcsrgeam2(...) {
 #endif // #if CUSPARSE_VERSION < 9020
 
 /*
- * Generic APIs are not suppoted on Windows in CUDA 10.x or earlier.
+ * Generic APIs are not suppoted in CUDA 10.x (or earlier) on Windows.
  */
 
 #if CUSPARSE_VERSION < 10010
