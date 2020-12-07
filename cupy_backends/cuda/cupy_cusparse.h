@@ -7,11 +7,23 @@
 #include <cusparse.h>
 
 #if !defined(CUSPARSE_VERSION)
-#if CUDA_VERSION < 10000
-#define CUSPARSE_VERSION CUDA_VERSION // CUDA_VERSION used instead
-#else
-#define CUSPARSE_VERSION 10000
-#endif
+  // CUSPARSE_VERSION introduced in CUDA 10.1 Update 2 (10.1.243).
+  #if CUDA_VERSION < 10000
+    #define CUSPARSE_VERSION CUDA_VERSION // CUDA_VERSION used instead
+  #elif CUDA_VERSION < 10010  // CUDA 10.0.x
+    # define CUSPARSE_VERSION 10000
+  #elif CUDA_VERSION < 10020  // CUDA 10.1.x
+    // CUSPARSE_VER_MAJOR introduced in CUDA 10.1 Update 1 (10.1.168).
+    #if !defined(CUSPARSE_VER_MAJOR)
+      // CUDA 10.1 (10.1.105) contains cuSPARSE 10.1
+      #define CUSPARSE_VERSION 10010
+    #else
+      // CUDA 10.1 Update 1 (10.1.168) contains cuSPARSE 10.2.0.0
+      #define CUSPARSE_VERSION (CUSPARSE_VER_MAJOR * 1000 + \
+                                CUSPARSE_VER_MINOR *  100 + \
+                                CUSPARSE_VER_PATCH)
+    #endif
+  #endif
 #endif // #if !defined(CUSPARSE_VERSION)
 
 #if CUSPARSE_VERSION < 9000
@@ -269,21 +281,49 @@ cusparseStatus_t cusparseZcsrgeam2(...) {
 
 #endif // #if CUSPARSE_VERSION < 9020
 
+/*
+ * Generic APIs are not suppoted on Windows in CUDA 10.x or earlier.
+ */
+
+#if CUSPARSE_VERSION < 10010
+// Added in cuSPARSE 10.1 (CUDA 10.1.105)
+
+// CSR2CSC
+typedef enum {} cusparseCsr2CscAlg_t;
+
+#endif  // #if CUSPARSE_VERSION < 10010
+
+#if (CUSPARSE_VERSION < 10010) || (CUSPARSE_VERSION < 11000 && defined(_WIN32))
+// Generic APIs added in cuSPARSE 10.1 (CUDA 10.1.105)
+
+typedef void* cusparseSpMatDescr_t;
+typedef void* cusparseDnMatDescr_t;
+typedef enum {} cusparseIndexType_t;
+typedef enum {} cusparseFormat_t;
+typedef enum {} cusparseOrder_t;
+typedef enum {} cusparseSpMMAlg_t;
+#endif  // #if (CUSPARSE_VERSION < 10010) || (CUSPARSE_VERSION < 11000 && defined(_WIN32))
+
+#if CUSPARSE_VERSION < 10200
+// Added in cuSPARSE 10.2 (CUDA 10.1.168)
+
+// CSR2CSC
+cusparseStatus_t cusparseCsr2cscEx2_bufferSize(...) {
+  return CUSPARSE_STATUS_SUCCESS;
+}
+
+cusparseStatus_t cusparseCsr2cscEx2(...) {
+  return CUSPARSE_STATUS_SUCCESS;
+}
+#endif // #if CUSPARSE_VERSION < 10200
+
 #if (CUSPARSE_VERSION < 10200) || (CUSPARSE_VERSION < 11000 && defined(_WIN32))
-// Types, macro and functions added in cuSparse 10.2
-// Windows support added in cuSparse 11.0
+// Generic APIs added in cuSPARSE 10.2 (CUDA 10.1.168)
 
 // cuSPARSE generic API
 typedef void* cusparseSpVecDescr_t;
 typedef void* cusparseDnVecDescr_t;
-typedef void* cusparseSpMatDescr_t;
-typedef void* cusparseDnMatDescr_t;
-
-typedef enum {} cusparseIndexType_t;
-typedef enum {} cusparseFormat_t;
-typedef enum {} cusparseOrder_t;
 typedef enum {} cusparseSpMVAlg_t;
-typedef enum {} cusparseSpMMAlg_t;
 
 cusparseStatus_t cusparseCreateSpVec(...) {
   return CUSPARSE_STATUS_SUCCESS;
@@ -432,6 +472,10 @@ cusparseStatus_t cusparseSpMM_bufferSize(...) {
 cusparseStatus_t cusparseSpMM(...) {
   return CUSPARSE_STATUS_SUCCESS;
 }
+#endif // #if (CUSPARSE_VERSION < 10200) || (CUSPARSE_VERSION < 11000 && defined(_WIN32))
+
+#if (CUSPARSE_VERSION < 10300) || (CUSPARSE_VERSION < 11000 && defined(_WIN32))
+// Generic APIs added in cuSPARSE 10.3 (CUDA 10.1.243)
 
 cusparseStatus_t cusparseConstrainedGeMM_bufferSize(...) {
   return CUSPARSE_STATUS_SUCCESS;
@@ -440,23 +484,7 @@ cusparseStatus_t cusparseConstrainedGeMM_bufferSize(...) {
 cusparseStatus_t cusparseConstrainedGeMM(...) {
   return CUSPARSE_STATUS_SUCCESS;
 }
-
-#endif // #if CUSPARSE_VERSION < 10200
-
-#if CUSPARSE_VERSION < 10200
-// Functions added in cuSparse 10.2
-
-// CSR2CSC
-typedef enum {} cusparseCsr2CscAlg_t;
-
-cusparseStatus_t cusparseCsr2cscEx2_bufferSize(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
-
-cusparseStatus_t cusparseCsr2cscEx2(...) {
-  return CUSPARSE_STATUS_SUCCESS;
-}
-#endif // #if CUSPARSE_VERSION < 10200
+#endif // #if (CUSPARSE_VERSION < 10300) || (CUSPARSE_VERSION < 11000 && defined(_WIN32))
 
 #if CUSPARSE_VERSION >= 11000
 // Functions deleted in cuSparse 11.0
