@@ -22,3 +22,4 @@ htmlcov/
 .pytest_cache/
 cupy/.data/
 cupy/cuda/thrust.h
+.configure_cache_*.pkl

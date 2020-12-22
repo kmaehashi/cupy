@@ -7,6 +7,7 @@ from distutils import sysconfig
 from distutils import unixccompiler
 import os
 from os import path
+import pickle
 import shutil
 import sys
 
@@ -782,30 +783,14 @@ except ImportError:
     cython_available = False
 
 
-def cythonize(extensions, arg_options):
-    directive_keys = ('linetrace', 'profile')
-    directives = {key: arg_options[key] for key in directive_keys}
+def cythonize(extensions, cythonize_options, arg_options):
+    directives = {
+        'linetrace': arg_options['linetrace'],
+        'profile': arg_options['profile'],
 
-    # Embed signatures for Sphinx documentation.
-    directives['embedsignature'] = True
-
-    cythonize_option_keys = ('annotate',)
-    cythonize_options = {key: arg_options[key]
-                         for key in cythonize_option_keys}
-
-    # Compile-time constants to be used in Cython code
-    compile_time_env = cythonize_options.get('compile_time_env')
-    if compile_time_env is None:
-        compile_time_env = {}
-        cythonize_options['compile_time_env'] = compile_time_env
-    compile_time_env['use_hip'] = arg_options['use_hip']
-    compile_time_env['CUPY_CUFFT_STATIC'] = False
-    compile_time_env['cython_version'] = str(cython_version)
-    if use_hip or arg_options['no_cuda']:
-        compile_time_env['CUDA_VERSION'] = 0
-    else:
-        compile_time_env['CUDA_VERSION'] = build.get_cuda_version()
-
+        # Embed signatures for Sphinx documentation.
+        'embedsignature': True,
+    }
     return Cython.Build.cythonize(
         extensions, verbose=True, language_level=3,
         compiler_directives=directives, **cythonize_options)
@@ -823,6 +808,22 @@ See https://docs.cupy.dev/en/stable/install.html for details.
 
 
 def get_ext_modules(use_cython=False):
+    use_cache = os.environ.get('CUPY_DEV_CONFIGURE_CACHE', '0') == '1'
+    cache = '.configure_cache_pyx.pkl' if use_cython else '.configure_cache_cpp.pkl'
+
+    if use_cache and os.path.exists(cache):
+        print('*** Loading cached configure results from: {}'.format(cache))
+        return pickle.load(open(cache, 'rb'))
+
+    extensions, cythonize_options = _get_ext_modules(use_cython)
+
+    if use_cache:
+        print('*** Caching configure results to: {}'.format(cache))
+        pickle.dump((extensions, cythonize_options), open(cache, 'wb'))
+
+    return extensions, cythonize_options
+
+def _get_ext_modules(use_cython):
     arg_options = cupy_setup_options
 
     # We need to call get_config_vars to initialize _config_vars in distutils
@@ -833,7 +834,28 @@ def get_ext_modules(use_cython=False):
 
     extensions = make_extensions(arg_options, compiler, use_cython)
 
-    return extensions
+    cythonize_options = None
+    if use_cython:
+        cythonize_options = _get_cythonize_options(arg_options)
+
+    return extensions, cythonize_options
+
+
+def _get_cythonize_options(arg_options):
+    # Compile-time constants to be used in Cython code
+    compile_time_env = {}
+    compile_time_env['use_hip'] = arg_options['use_hip']
+    compile_time_env['CUPY_CUFFT_STATIC'] = False
+    compile_time_env['cython_version'] = str(cython_version)
+    if use_hip or arg_options['no_cuda']:
+        compile_time_env['CUDA_VERSION'] = 0
+    else:
+        compile_time_env['CUDA_VERSION'] = build.get_cuda_version()
+
+    return {
+        'annotate': arg_options['annotate'],
+        'compile_time_env': compile_time_env,
+    }
 
 
 def _nvcc_gencode_options(cuda_version):
@@ -1058,8 +1080,8 @@ class sdist_with_cython(sdist.sdist):
     def __init__(self, *args, **kwargs):
         if not cython_available:
             raise RuntimeError('Cython is required to make sdist.')
-        ext_modules = get_ext_modules(True)  # get .pyx modules
-        cythonize(ext_modules, cupy_setup_options)
+        ext_modules, cythonize_options = get_ext_modules(True)  # get .pyx modules
+        cythonize(ext_modules, cythonize_options, cupy_setup_options)
         sdist.sdist.__init__(self, *args, **kwargs)
 
 
@@ -1087,8 +1109,8 @@ class custom_build_ext(build_ext.build_ext):
             # ccompiler.new_compiler() function to hook.
             self.compiler = 'nvidia'
         if cython_available:
-            ext_modules = get_ext_modules(True)  # get .pyx modules
-            cythonize(ext_modules, cupy_setup_options)
+            ext_modules, cythonize_options = get_ext_modules(True)  # get .pyx modules
+            cythonize(ext_modules, cythonize_options, cupy_setup_options)
         check_extensions(self.extensions)
         build_ext.build_ext.run(self)
 

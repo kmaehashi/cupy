@@ -115,7 +115,7 @@ package_data['cupy'] += cupy_setup_build.prepare_wheel_libs()
 
 package_name = cupy_setup_build.get_package_name()
 long_description = cupy_setup_build.get_long_description()
-ext_modules = cupy_setup_build.get_ext_modules()
+ext_modules, _ = cupy_setup_build.get_ext_modules()
 build_ext = cupy_setup_build.custom_build_ext
 sdist = cupy_setup_build.sdist_with_cython
 
