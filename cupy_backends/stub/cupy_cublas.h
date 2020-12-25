@@ -3,7 +3,7 @@
 #ifndef INCLUDE_GUARD_STUB_CUPY_CUBLAS_H
 #define INCLUDE_GUARD_STUB_CUPY_CUBLAS_H
 
-#include "../cupy_cuda_common.h"
+#include "cupy_cuda_common.h"
 
 extern "C" {
 
@@ -305,7 +305,27 @@ cublasStatus_t cublasDgeam(...) {
     return CUBLAS_STATUS_SUCCESS;
 }
 
+cublasStatus_t cublasCgeam(...) {
+    return CUBLAS_STATUS_SUCCESS;
+}
+
+cublasStatus_t cublasZgeam(...) {
+    return CUBLAS_STATUS_SUCCESS;
+}
+
 cublasStatus_t cublasSdgmm(...) {
+    return CUBLAS_STATUS_SUCCESS;
+}
+
+cublasStatus_t cublasDdgmm(...) {
+    return CUBLAS_STATUS_SUCCESS;
+}
+
+cublasStatus_t cublasCdgmm(...) {
+    return CUBLAS_STATUS_SUCCESS;
+}
+
+cublasStatus_t cublasZdgmm(...) {
     return CUBLAS_STATUS_SUCCESS;
 }
 

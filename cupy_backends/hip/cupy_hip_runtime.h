@@ -2,9 +2,11 @@
 #define INCLUDE_GUARD_HIP_CUPY_RUNTIME_H
 
 #include <hip/hip_runtime_api.h>
-#include "cupy_common.h"
+#include "cupy_hip_common.h"
 
 extern "C" {
+
+bool hip_environment = true;
 
 // Error handling
 const char* cudaGetErrorName(cudaError_t hipError) {
@@ -254,6 +256,10 @@ cudaError_t cudaStreamAddCallback(cudaStream_t stream,
                                   cudaStreamCallback_t callback,
                                   void *userData, unsigned int flags) {
     return hipStreamAddCallback(stream, callback, userData, flags);
+}
+
+cudaError_t cudaLaunchHostFunc(cudaStream_t stream, cudaHostFn_t fn, void* userData) {
+    return hipErrorUnknown;
 }
 
 cudaError_t cudaStreamQuery(cudaStream_t stream) {
