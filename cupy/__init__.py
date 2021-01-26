@@ -12,7 +12,7 @@ _environment._preload_libraries()  # NOQA
 
 
 try:
-    from cupy._version import __version__
+    from cupy._version import __version__  # NOQA
 except ImportError as e:
     raise ImportError('''
 Error importing CuPy: version information could not be found.
