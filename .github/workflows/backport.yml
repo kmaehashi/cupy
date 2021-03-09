@@ -7,7 +7,6 @@ on:
 jobs:
   backport:
     if: |
-        github.repository_owner == 'cupy' &&
         github.event.action == 'closed' &&
         github.event.pull_request.merged == true &&
         contains(github.event.issue.labels.*.name, 'to-be-backported')
