@@ -1,7 +1,10 @@
+import ctypes
+import ctypes.util
 import inspect
 import io
 import os
 import platform
+import sys
 
 import numpy
 
@@ -56,14 +59,48 @@ except ImportError:
 is_hip = cupy_backends.cuda.api.runtime.is_hip
 
 
-def _eval_or_error(func, errors):
+def _eval_or_error(func, errors, funcptr=None):
     # Evaluates `func` and return the result.
     # If an error specified by `errors` occured, it returns a string
     # representing the error.
     try:
-        return func()
+        ver = func()
+        if funcptr is not None:
+            path = _get_cdll_path(funcptr())
+            if path is not None:
+                return f'{ver} {path}'
+        return ver
     except errors as e:
         return repr(e)
+
+
+def _get_cdll_path(funcptr):
+    if not sys.platform.startswith('linux'):
+        return None
+    libdl_path = ctypes.util.find_library('dl')
+    if libdl_path is None:
+        return None
+    try:
+        libdl = ctypes.CDLL(libdl_path)
+    except OSError:
+        return None
+    if libdl is None or not hasattr(libdl, 'dladdr'):
+        return None
+
+    class Dl_info(ctypes.Structure):
+        _fields_ = (
+            ('dli_fname', ctypes.c_char_p),
+            ('dli_fbase', ctypes.c_void_p),
+            ('dli_sname', ctypes.c_char_p),
+            ('dli_saddr', ctypes.c_void_p),
+        )
+
+    libdl.dladdr.argtypes = (ctypes.c_void_p, ctypes.POINTER(Dl_info))
+    info = Dl_info()
+    result = libdl.dladdr(funcptr, ctypes.byref(info))
+    if result == 0:
+        return '(error)'
+    return info.dli_fname.decode()
 
 
 class _InstallInfo(object):
@@ -147,7 +184,8 @@ class _RuntimeInfo(object):
         self.cuda_build_version = cupy.cuda.driver.get_build_version()
         self.cuda_driver_version = _eval_or_error(
             cupy.cuda.runtime.driverGetVersion,
-            cupy.cuda.runtime.CUDARuntimeError)
+            cupy.cuda.runtime.CUDARuntimeError,
+            cupy.cuda.driver._funcptr)
 
         self.cuda_runtime_version = _eval_or_error(
             cupy.cuda.runtime.runtimeGetVersion,

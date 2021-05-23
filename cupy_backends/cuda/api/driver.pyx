@@ -99,6 +99,10 @@ cdef extern from '../../cupy_backend.h' nogil:
     int HIP_VERSION
 
 
+cpdef intptr_t _funcptr():
+    return <intptr_t>cuGetErrorName
+
+
 ###############################################################################
 # Error handling
 ###############################################################################
