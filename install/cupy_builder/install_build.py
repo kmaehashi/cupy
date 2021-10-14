@@ -19,10 +19,6 @@ minimum_cudnn_version = 7600
 
 minimum_hip_version = 305  # for ROCm 3.5.0+
 
-_cuda_path = 'NOT_INITIALIZED'
-_rocm_path = 'NOT_INITIALIZED'
-_compiler_base_options = None
-
 use_hip = bool(int(os.environ.get('CUPY_INSTALL_USE_HIP', '0')))
 
 

@@ -1,23 +1,17 @@
+import distutils.util
+import os.path
+import subprocess
+
+import cupy_builder.install_utils as utils
+import cupy_builder.install_build
+from cupy_builder.install_build import PLATFORM_WIN32, _tempdir
+
+
 def get_rocm_path():
-    global _rocm_path
-
-    # Use a magic word to represent the cache not filled because None is a
-    # valid return value.
-    if _rocm_path != 'NOT_INITIALIZED':
-        return _rocm_path
-
-    _rocm_path = os.environ.get('ROCM_HOME', '')
-    return _rocm_path
+    return os.environ.get('ROCM_HOME', '')
 
 
 def get_cuda_path():
-    global _cuda_path
-
-    # Use a magic word to represent the cache not filled because None is a
-    # valid return value.
-    if _cuda_path != 'NOT_INITIALIZED':
-        return _cuda_path
-
     nvcc_path = utils.search_on_path(('nvcc', 'nvcc.exe'))
     cuda_path_default = None
     if nvcc_path is not None:
@@ -136,7 +130,6 @@ def get_compiler_setting(use_hip):
     # for <cupy/complex.cuh>
     cupy_header = os.path.join(
         cupy_builder.get_context().source_root, 'cupy/_core/include')
-    global _jitify_path
     _jitify_path = os.path.join(cupy_header, 'cupy/jitify')
     if cuda_path:
         cuda_cub_path = os.path.join(cuda_path, 'include', 'cub')
@@ -148,7 +141,6 @@ def get_compiler_setting(use_hip):
             cuda_cub_path = None
     else:
         cuda_cub_path = None
-    global _cub_path
     if cuda_cub_path:
         _cub_path = cuda_cub_path
     elif not use_hip:  # CuPy's bundle doesn't work for ROCm
@@ -157,6 +149,9 @@ def get_compiler_setting(use_hip):
         raise Exception('Please install hipCUB and retry')
     include_dirs.insert(0, _cub_path)
     include_dirs.insert(1, cupy_header)
+
+    install_build._cub_path = _cub_path
+    install_build._jitify_path = _jitify_path
 
     return {
         'include_dirs': include_dirs,
@@ -193,13 +188,6 @@ def get_compiler_base_options(compiler_path):
     """Returns base options for nvcc compiler.
 
     """
-    global _compiler_base_options
-    if _compiler_base_options is None:
-        _compiler_base_options = _get_compiler_base_options(compiler_path)
-    return _compiler_base_options
-
-
-def _get_compiler_base_options(compiler_path):
     # Try compiling a dummy code.
     # If the compilation fails, try to parse the output of compilation
     # and try to compose base options according to it.
