@@ -1,38 +1,39 @@
 import distutils.util
 import os.path
 import subprocess
+from typing import Any, Optional, Sequence
 
 import cupy_builder
 import cupy_builder.install_utils as utils
-import cupy_builder.install_build
+from cupy_builder import install_build
 from cupy_builder.install_build import PLATFORM_WIN32, _tempdir
 
 
 class Environment:
-    def __init__(self, context: cupy_builder.Context):
-        self._context = context
+    def __init__(self, ctx: cupy_builder.Context):
+        self._use_hip = ctx.use_hip
 
-        self.rocm_path: Optional[str] = None
         self.cuda_path: Optional[str] = None
         self.nvcc_path: Optional[str] = None
+        self.rocm_path: Optional[str] = None
         self.hipcc_path: Optional[str] = None
-        self.default_compiler_settings: Mapping[str, str] = {}
-        self.default_compiler_options: Mapping[str, str] = {}
-        self.compute_capabilities: Sequence[int] = []
+        if not ctx.use_stub:
+            if not ctx.use_hip:
+                self.cuda_path = get_cuda_path()
+                self.nvcc_path = compiler_path = get_nvcc_path()
+            else:
+                self.rocm_path = get_rocm_path()
+                self.hipcc_path = compiler_path = get_hipcc_path()
 
-    def configure(self, compiler: Any, settings: Any) -> None:
-        use_hip = self._context.use_hip
-        if not use_hip:
-            self.cuda_path = get_cuda_path()
-            self.nvcc_path = compiler_path = get_nvcc_path()
-        else:
-            self.rocm_path = get_rocm_path()
-            self.hipcc_path = compiler_path = get_hipcc_path()
-        self.default_compiler_settings = get_compiler_settings(use_hip)
+        self.default_compiler_settings = get_compiler_setting(ctx.use_hip)
         self.default_compiler_options = get_compiler_base_options(
             compiler_path)
-        self.compute_capabilities = check_compute_capabilities(
-            compiler, settings)
+        self.compute_capabilities: Optional[Sequence[int]] = None
+
+    def configure(self, compiler: Any, settings: Any) -> None:
+        if not self._use_hip:
+            self.compute_capabilities = (
+                install_build.check_compute_capabilities(compiler, settings))
 
 
 def get_rocm_path():

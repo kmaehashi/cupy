@@ -41,7 +41,13 @@ class Context:
         if os.environ.get('READTHEDOCS', None) == 'True':
             self.use_stub = True
 
-        self.env = cupy_builder._environment.Environment(self)
+        self._env: Optional[cupy_builder._environment.Environment] = None
+
+    @property
+    def env(self):
+        if self._env is None:
+            self._env = cupy_builder._environment.Environment(self)
+        return self._env
 
 
 def parse_args(argv: List[str]) -> Tuple[Any, List[str]]:

@@ -89,7 +89,7 @@ def canonicalize_hip_libraries(hip_version, libraries):
     libraries.extend(new_libraries)
 
 
-def preconfigure_modules(MODULES, compiler, settings):
+def preconfigure_modules(ctx: Context, MODULES, compiler, settings):
     """Returns a list of modules buildable in given environment and settings.
 
     For each module in MODULES list, this function checks if the module
@@ -97,8 +97,8 @@ def preconfigure_modules(MODULES, compiler, settings):
     Returns a list of module names available.
     """
 
-    nvcc_path = build.get_nvcc_path()
-    hipcc_path = build.get_hipcc_path()
+    nvcc_path = ctx.env.nvcc_path
+    hipcc_path = ctx.env.hipcc_path
     summary = [
         '',
         '************************************************************',
@@ -155,7 +155,7 @@ def preconfigure_modules(MODULES, compiler, settings):
             if module['check_method'](compiler, settings):
                 hip_version = module['version_method']()
                 if hip_version >= 401:
-                    rocm_path = build.get_rocm_path()
+                    rocm_path = ctx.env.rocm_path
                     inc_path = os.path.join(rocm_path, 'hipfft', 'include')
                     settings['include_dirs'].insert(0, inc_path)
                     lib_path = os.path.join(rocm_path, 'hipfft', 'lib')
@@ -265,7 +265,7 @@ def make_extensions(ctx: Context, compiler, use_cython):
 
     no_cuda = ctx.use_stub
     use_hip = not no_cuda and ctx.use_hip
-    settings = build.get_compiler_setting(use_hip)
+    settings = copy.deepcopy(ctx.env.default_compiler_settings)
 
     include_dirs = settings['include_dirs']
 
@@ -298,12 +298,14 @@ def make_extensions(ctx: Context, compiler, use_cython):
         # deprecated since ROCm 4.2.0
         settings['define_macros'].append(('__HIP_PLATFORM_HCC__', '1'))
 
+    ctx.env.configure(compiler, settings)
+
     available_modules = []
     if no_cuda:
         available_modules = [m['name'] for m in MODULES]
     else:
         available_modules, settings = preconfigure_modules(
-            MODULES, compiler, settings)
+            ctx, MODULES, compiler, settings)
         required_modules = get_required_modules(MODULES)
         if not (set(required_modules) <= set(available_modules)):
             raise Exception('Your CUDA environment is invalid. '
