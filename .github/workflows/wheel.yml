@@ -10,10 +10,11 @@ on:
 jobs:
   wheel-linux:
     if: |
-        github.repository_owner == 'cupy'
+        github.repository_owner == 'kmaehashi'
     runs-on: ubuntu-20.04
-    matrix:
-      cuda: ["10.2", "10.2-jetson", "11.0", "11.1", "11.2", "11.3", "11.4", "11.5"]
+    strategy:
+      matrix:
+        cuda: ["10.2", "10.2-jetson", "11.0", "11.1", "11.2", "11.3", "11.4", "11.5"]
     env:
       TARGET_BRANCH: ${{ github.event.release.target_commitish }}
 
