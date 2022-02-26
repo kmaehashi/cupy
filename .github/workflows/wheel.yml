@@ -1,8 +1,11 @@
 name: "Wheel Build"
 
 on:
-  release:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Drafted Release to Upload'
+        type: string
 
 jobs:
   wheel-linux:
@@ -13,7 +16,6 @@ jobs:
       cuda: ["10.2", "10.2-jetson", "11.0", "11.1", "11.2", "11.3", "11.4", "11.5"]
     env:
       TARGET_BRANCH: ${{ github.event.release.target_commitish }}
-      TAG_NAME: ${{ github.event.release.tag_name }}
 
     steps:
     - name: Checkout
@@ -31,8 +33,9 @@ jobs:
         CUPY_RELEASE_SKIP_VERIFY=1 ./.pfnci/wheel-linux/main.sh "${{ matrix.cuda }}" "3.7,3.8,3.9,3.10" "${TARGET_BRANCH}"
 
     - name: Upload
+      if: ${{ github.event.inputs.release != "" }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd cupy-release-tools
-        gh release --repo kmaehashi/cupy upload "${TAG_NAME}" *.whl
+        gh release --repo kmaehashi/cupy upload "${{ github.event.inputs.release }}" *.whl
