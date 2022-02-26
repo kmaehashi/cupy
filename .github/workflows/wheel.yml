@@ -34,7 +34,7 @@ jobs:
         CUPY_RELEASE_SKIP_VERIFY=1 ./.pfnci/wheel-linux/main.sh "${{ matrix.cuda }}" "3.7,3.8,3.9,3.10" "${TARGET_BRANCH}"
 
     - name: Upload
-      if: ${{ github.event.inputs.release != "" }}
+      if: ${{ github.event.inputs.release }} != ""
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
