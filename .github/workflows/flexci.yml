@@ -2,14 +2,14 @@ name: "FlexCI"
 
 on:
   push:
-    branches: ["master", "v[0-9]+"]
+    branches: ["master", "v[0-9]+", "dispatch-push-event-from-actions"]
   issue_comment:
     types: [created]
 
 jobs:
   dispatch:
     if: |
-        github.repository_owner == 'cupy' &&
+        github.repository_owner == 'kmaehashi' &&
         (
             (github.event_name == 'issue_comment' &&
              github.event.issue.pull_request &&
@@ -36,6 +36,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         FLEXCI_WEBHOOK_SECRET: ${{ secrets.FLEXCI_WEBHOOK_SECRET }}
       run: |
+        cat "${GITHUB_EVENT_PATH}"
         ./.github/workflows/flexci_dispatcher.py \
             --event "${GITHUB_EVENT_NAME}" \
             --webhook "${GITHUB_EVENT_PATH}" \
