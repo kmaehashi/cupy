@@ -72,7 +72,10 @@ def _complement_commit_status(
     gh_commit = gh_repo.get_commit(sha)
     contexts = [s.context for s in gh_commit.get_statuses()]
     for prj in projects:
-        context = f'{context_prefix}/{prj}'
+        if prj.startswith('@'):
+            context = prj[1:]
+        else:
+            context = f'{context_prefix}/{prj}'
         if context in contexts:
             # Preserve status set via previous (real) CI run.
             continue
