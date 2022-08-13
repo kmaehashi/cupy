@@ -15,14 +15,10 @@ jobs:
             (github.event.action == 'closed'  && contains(github.event.pull_request.labels.*.name, 'to-be-backported')) ||
             (github.event.action == 'labeled' && github.event.label.name == 'to-be-backported')
         )
-    runs-on: ubuntu-18.04
-    env:
-      CUPY_CI: GitHub
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-      with:
-        submodules: recursive
 
     - name: setup python
       uses: actions/setup-python@v2
