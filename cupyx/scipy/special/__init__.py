@@ -5,6 +5,10 @@ from cupyx.scipy.special._bessel import i1  # NOQA
 from cupyx.scipy.special._bessel import i1e  # NOQA
 from cupyx.scipy.special._bessel import j0  # NOQA
 from cupyx.scipy.special._bessel import j1  # NOQA
+from cupyx.scipy.special._bessel import k0  # NOQA
+from cupyx.scipy.special._bessel import k0e  # NOQA
+from cupyx.scipy.special._bessel import k1  # NOQA
+from cupyx.scipy.special._bessel import k1e  # NOQA
 from cupyx.scipy.special._bessel import y0  # NOQA
 from cupyx.scipy.special._bessel import y1  # NOQA
 from cupyx.scipy.special._bessel import yn  # NOQA
@@ -79,6 +83,8 @@ from cupyx.scipy.special._lpmv import lpmv  # NOQA
 from cupyx.scipy.special._sph_harm import sph_harm  # NOQA
 
 # Other special functions
+from cupyx.scipy.special._exp1 import exp1  # NOQA
+from cupyx.scipy.special._expi import expi  # NOQA
 from cupyx.scipy.special._expn import expn  # NOQA
 from cupyx.scipy.special._softmax import softmax  # NOQA
 from cupyx.scipy.special._logsoftmax import log_softmax  # NOQA
@@ -99,4 +105,5 @@ from cupyx.scipy.special._basic import cosm1  # NOQA
 from cupy._math.rounding import round_ as round  # NOQA
 from cupyx.scipy.special._xlogy import xlogy  # NOQA
 from cupyx.scipy.special._xlogy import xlog1py  # NOQA
+from cupyx.scipy.special._logsumexp import logsumexp  # NOQA
 from cupy._math.special import sinc  # NOQA

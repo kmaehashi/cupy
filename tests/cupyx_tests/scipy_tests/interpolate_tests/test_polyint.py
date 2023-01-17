@@ -4,6 +4,7 @@ import pytest
 import cupy
 from cupy import testing
 import cupyx.scipy.interpolate  # NOQA
+from cupyx.scipy.interpolate import CubicHermiteSpline
 
 try:
     from scipy import interpolate  # NOQA
@@ -148,3 +149,271 @@ class TestBarycentric:
         y = xp.arange(1, 11, dtype=dtype)
         xi = xp.array(1000 * 9.5)
         return scp.interpolate.barycentric_interpolate(x, y, xi)
+
+
+@testing.with_requires("scipy")
+class TestKrogh:
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-7, rtol=1e-7)
+    def test_lagrange(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind in 'u':
+            pytest.skip()
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        test_xs = xp.linspace(-5, 5, 5, dtype=dtype)
+        xs = xp.linspace(-1, 1, 5, dtype=dtype)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        return P(test_xs)
+
+    @testing.for_all_dtypes(no_bool=True, no_float16=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-6, rtol=1e-6)
+    def test_scalar(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind in 'u':
+            pytest.skip()
+        true_poly = numpy.poly1d([-1, 2, 6, -3, 2])
+        xs = numpy.linspace(-1, 1, 10, dtype=dtype)
+        ys = true_poly(xs)
+        if xp is cupy:
+            xs = cupy.asarray(xs)
+            ys = cupy.asarray(ys)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        return P(xp.array(7, dtype=dtype))
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-7, rtol=1e-7)
+    def test_derivatives(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind in 'u':
+            pytest.skip()
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        test_xs = xp.linspace(-5, 5, 5, dtype=dtype)
+        xs = xp.linspace(-1, 1, 5, dtype=dtype)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        D = P.derivatives(test_xs)
+        return D
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-7, rtol=1e-7)
+    def test_low_derivatives(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind in 'u':
+            pytest.skip()
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        test_xs = xp.linspace(-5, 5, 5, dtype=dtype)
+        xs = xp.linspace(-1, 1, 5, dtype=dtype)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        D = P.derivatives(test_xs, len(xs) + 2)
+        return D
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-7, rtol=1e-7)
+    def test_derivative(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind in 'u':
+            pytest.skip()
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        test_xs = xp.linspace(-5, 5, 5, dtype=dtype)
+        xs = xp.linspace(-1, 1, 5, dtype=dtype)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        m = 10
+        return [P.derivative(test_xs, i) for i in range(m)]
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-7, rtol=1e-7)
+    def test_high_derivative(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind in 'u':
+            pytest.skip()
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        test_xs = xp.linspace(-5, 5, 5, dtype=dtype)
+        xs = xp.linspace(-1, 1, 5, dtype=dtype)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        D = P.derivative(test_xs, 2 * len(xs))
+        return D
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-7, rtol=1e-7)
+    def test_hermite(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind in 'u':
+            pytest.skip()
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        test_xs = xp.linspace(-5, 5, 5, dtype=dtype)
+        xs = xp.linspace(-1, 1, 5, dtype=dtype)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        D = P(test_xs)
+        return D
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-7, rtol=1e-7)
+    def test_hermite_derivative(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind in 'u':
+            pytest.skip()
+        xs = xp.array([0, 0, 0], dtype=dtype)
+        ys = xp.array([1, 2, 3], dtype=dtype)
+        test_xs = xp.linspace(-5, 5, 5, dtype=dtype)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        return P(test_xs)
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp', atol=1e-7, rtol=1e-7)
+    def test_vector(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind == 'u':
+            pytest.skip()
+        xs = xp.array([0, 1, 2], dtype=dtype)
+        ys = xp.array([[0, 1], [1, 0], [2, 1]], dtype=dtype)
+        test_xs = xp.linspace(-1, 3, 5, dtype=dtype)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        return P(test_xs)
+
+    @testing.for_dtypes('bhilfd')
+    @testing.numpy_cupy_allclose(scipy_name='scp')
+    def test_empty(self, xp, scp, dtype):
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        xs = xp.linspace(-5, 5, 5, dtype=dtype)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        return P(xp.array([]))
+
+    @pytest.mark.parametrize('test_xs', [0, [0], [0, 1]])
+    @testing.numpy_cupy_array_equal(scipy_name='scp')
+    def test_shapes_scalarvalue(self, xp, scp, test_xs):
+        true_poly = xp.poly1d([-2, 3, 5, 1, -3])
+        xs = xp.linspace(-1, 10, 10)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        test_xs = xp.array(test_xs)
+        return xp.shape(P(test_xs))
+
+    @pytest.mark.parametrize('test_xs', [0, [0], [0, 1]])
+    @testing.numpy_cupy_array_equal(scipy_name='scp')
+    def test_shapes_scalarvalue_derivatives(self, xp, scp, test_xs):
+        true_poly = xp.poly1d([-2, 3, 5, 1, -3])
+        xs = xp.linspace(-1, 10, 10)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(xs, ys)
+        test_xs = xp.array(test_xs)
+        return xp.shape(P.derivatives(test_xs))
+
+    @pytest.mark.parametrize('test_xs', [0, [0], [0, 1]])
+    @testing.numpy_cupy_array_equal(scipy_name='scp')
+    def test_shapes_vectorvalue(self, xp, scp, test_xs):
+        true_poly = xp.poly1d([4, -5, 3, 2, -4])
+        xs = xp.linspace(-10, 10, 20)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(
+            xs, xp.outer(ys, xp.arange(3)))
+        test_xs = xp.array(test_xs)
+        return xp.shape(P(test_xs))
+
+    @pytest.mark.parametrize('test_xs', [0, [0], [0, 1]])
+    @testing.numpy_cupy_array_equal(scipy_name='scp')
+    def test_shapes_vectorvalue_derivative(self, xp, scp, test_xs):
+        true_poly = xp.poly1d([4, -5, 3, 2, -4])
+        xs = xp.linspace(-10, 10, 20)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(
+            xs, xp.outer(ys, xp.arange(3)))
+        test_xs = xp.array(test_xs)
+        return xp.shape(P.derivatives(test_xs))
+
+    @pytest.mark.parametrize('test_xs', [0, [0], [0, 1]])
+    @testing.numpy_cupy_array_equal(scipy_name='scp')
+    def test_shapes_1d_vectorvalue(self, xp, scp, test_xs):
+        true_poly = xp.poly1d([-3, -1, 4, 9, 8])
+        xs = xp.linspace(-1, 10, 10)
+        ys = true_poly(xs)
+        P = scp.interpolate.KroghInterpolator(
+            xs, xp.outer(ys, xp.array([1])))
+        test_xs = xp.array(test_xs)
+        return xp.shape(P(test_xs))
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp')
+    def test_wrapper(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind == 'u':
+            pytest.skip()
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        test_xs = xp.linspace(-2, 2, 5, dtype=dtype)
+        xs = xp.linspace(-1, 1, 5, dtype=dtype)
+        ys = true_poly(xs)
+        return scp.interpolate.krogh_interpolate(xs, ys, test_xs)
+
+    @testing.for_all_dtypes(no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(scipy_name='scp')
+    def test_wrapper2(self, xp, scp, dtype):
+        if xp.dtype(dtype).kind == 'u':
+            pytest.skip()
+        true_poly = xp.poly1d([-2, 3, 1, 5, -4])
+        test_xs = xp.linspace(-2, 2, 5, dtype=dtype)
+        xs = xp.linspace(-1, 1, 5, dtype=dtype)
+        ys = true_poly(xs)
+        return scp.interpolate.krogh_interpolate(xs, ys, test_xs, der=3)
+
+    @testing.numpy_cupy_allclose(scipy_name='scp')
+    def test_derivatives_complex(self, xp, scp):
+        x = xp.array([-1, -1, 0, 1, 1])
+        y = xp.array([1, 1.0j, 0, -1, 1.0j])
+        P = scp.interpolate.KroghInterpolator(x, y)
+        D = P.derivatives(xp.array(0))
+        return D
+
+
+@testing.with_requires("scipy>=1.10.0")
+class TestZeroSizeArrays:
+    # regression tests for gh-17241 : CubicSpline et al must not segfault
+    # when y.size == 0
+    # The two methods below are _almost_ the same, but not quite:
+    # one is for objects which have the `bc_type` argument (CubicSpline)
+    # and the other one is for those which do not (Pchip, Akima1D)
+
+    # XXX: add CubicSpline to the test loop, when implemented
+
+    @testing.numpy_cupy_allclose(scipy_name='scp')
+    @pytest.mark.parametrize('y_shape', [(10, 0, 5), (10, 5, 0)])
+    @pytest.mark.parametrize('bc_type',
+                             ['not-a-knot', 'periodic', 'natural', 'clamped'])
+    @pytest.mark.parametrize('axis', [0, 1, 2])
+    @pytest.mark.parametrize('klass', ['make_interp_spline', ])
+    def test_zero_size(self, xp, scp, klass, y_shape, bc_type, axis):
+        x = xp.arange(10)
+        y = xp.zeros(y_shape)
+        xval = xp.arange(3)
+
+        cls = getattr(scp.interpolate, klass)
+        obj = cls(x, y, bc_type=bc_type)
+        assert obj(xval).size == 0
+        assert obj(xval).shape == xval.shape + y.shape[1:]
+
+        # Also check with an explicit non-default axis
+        yt = xp.moveaxis(y, 0, axis)  # (10, 0, 5) --> (0, 10, 5) if axis=1 etc
+
+        obj = cls(x, yt, bc_type=bc_type, axis=axis)
+        sh = yt.shape[:axis] + (xval.size, ) + yt.shape[axis+1:]
+        assert obj(xval).size == 0
+        assert obj(xval).shape == sh
+
+
+@testing.with_requires("scipy")
+class TestCubicHermiteSpline:
+
+    @testing.numpy_cupy_allclose(scipy_name='scp')
+    def test_correctness(self, xp, scp):
+        x = xp.asarray([0, 2, 7])
+        y = xp.asarray([-1, 2, 3])
+        dydx = xp.asarray([0, 3, 7])
+        s = scp.interpolate.CubicHermiteSpline(x, y, dydx)
+        return s(x), s(x, 1)
+
+    def test_ctor_error_handling(self):
+        x = cupy.asarray([1, 2, 3])
+        y = cupy.asarray([0, 3, 5])
+        dydx = cupy.asarray([1, -1, 2, 3])
+        dydx_with_nan = cupy.asarray([1, 0, cupy.nan])
+
+        with pytest.raises(ValueError):
+            CubicHermiteSpline(x, y, dydx)
+
+        with pytest.raises(ValueError):
+            CubicHermiteSpline(x, y, dydx_with_nan)

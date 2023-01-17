@@ -13,6 +13,10 @@ Bessel functions
 
    j0
    j1
+   k0
+   k0e
+   k1
+   k1e
    y0
    y1
    yn
@@ -128,6 +132,8 @@ Other special functions
 .. autosummary::
    :toctree: generated/
 
+   exp1
+   expi
    expn
    softmax
    log_softmax
@@ -154,4 +160,5 @@ Convenience functions
    round
    xlogy
    xlog1py
+   logsumexp
    sinc

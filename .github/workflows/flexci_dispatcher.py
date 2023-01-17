@@ -57,9 +57,9 @@ def _forward_to_flexci(
     raise RuntimeError(f'unexpected response: {response}')
 
 
-def _complement_commit_status(
+def _fill_commit_status(
         event_name: str, payload: Dict[str, Any], token: str,
-        projects: Set[str], context_prefix: str) -> None:
+        projects: Set[str], context_prefix: str, base_url: str) -> None:
     gh_repo = github.Github(token).get_repo(payload['repository']['full_name'])
     if event_name == 'push':
         sha = payload['after']
@@ -68,8 +68,21 @@ def _complement_commit_status(
     else:
         assert False
 
-    _log(f'Checking statuses for commit {sha}')
+    _log(f'Retrieving commit {sha}')
     gh_commit = gh_repo.get_commit(sha)
+
+    _log('Setting dashboard url to commit status')
+    gh_commit.create_status(
+        state='success',
+        context=f'{context_prefix} (dashboard)',
+        target_url=f'{base_url}/p/dashboard_by_commit_id?commit_id={sha}',
+    )
+
+    if len(projects) == 0:
+        _log('No projects to complement commit status')
+        return
+
+    _log(f'Checking statuses for commit {sha}')
     contexts = [s.context for s in gh_commit.get_statuses()]
     for prj in projects:
         context = f'{context_prefix}/{prj}'
@@ -110,6 +123,9 @@ def parse_args(argv: Any) -> Any:
     parser.add_argument(
         '--flexci-context', type=str, default='pfn-public-ci',
         help='Context prefix of the FlexCI server (default: %(default)s)')
+    parser.add_argument(
+        '--external-tag', action='append', default=[],
+        help='Test tags to be ignored by FlexCI Dispatcher')
     return parser.parse_args(argv[1:])
 
 
@@ -138,7 +154,12 @@ def main(argv: Any) -> int:
         if requested_tags is None:
             _log('No test requested in comment.')
             return 0
+        if len(requested_tags - set(options.external_tag)) == 0:
+            _log('All tests requested are not for FlexCI')
+            requested_tags = {'skip'}
 
+        # Note: this is not for security but to show a friendly message.
+        # FlexCI server also validates the membership of the user triggered.
         association = payload['comment']['author_association']
         if association not in ('OWNER', 'MEMBER'):
             _log(f'Tests cannot be triggered by {association}')
@@ -152,11 +173,12 @@ def main(argv: Any) -> int:
     projects_dispatch: Set[str] = set()
     projects_skip: Set[str] = set()
     for project, tags in project_tags.items():
-        _log(f'Project: {project} (tags: {tags})')
-        if len(set(tags) & requested_tags) != 0:
+        dispatch = (len(set(tags) & requested_tags) != 0)
+        if dispatch:
             projects_dispatch.add(project)
         else:
             projects_skip.add(project)
+        _log(f'Project: {"✅" if dispatch else "🚫"} {project} (tags: {tags})')
 
     if len(projects_dispatch) == 0:
         if requested_tags == {'skip'}:
@@ -173,10 +195,9 @@ def main(argv: Any) -> int:
             _log('Failed to dispatch')
             return 1
 
-    if len(projects_skip) != 0:
-        _complement_commit_status(
-            event_name, payload, github_token, projects_skip,
-            options.flexci_context)
+    _fill_commit_status(
+        event_name, payload, github_token, projects_skip,
+        options.flexci_context, options.flexci_uri)
 
     return 0
 

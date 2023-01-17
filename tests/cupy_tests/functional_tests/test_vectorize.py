@@ -18,6 +18,15 @@ class TestVectorizeOps(unittest.TestCase):
         ]
         return f(*args)
 
+    @testing.for_all_dtypes()
+    @testing.numpy_cupy_allclose(rtol=1e-6)
+    def test_vectorize_reciprocal(self, xp, dtype):
+        def my_reciprocal(x):
+            scalar = xp.dtype(dtype).type(10)
+            return xp.reciprocal(x + scalar)
+
+        return self._run(my_reciprocal, xp, [dtype])
+
     @testing.for_all_dtypes_combination(names=('dtype1', 'dtype2'))
     @testing.numpy_cupy_array_equal()
     def test_vectorize_add(self, xp, dtype1, dtype2):
@@ -49,6 +58,19 @@ class TestVectorizeOps(unittest.TestCase):
             return x ** y
 
         f = xp.vectorize(my_pow)
+        x1 = testing.shaped_random((20, 30), xp, dtype1, seed=0)
+        x2 = testing.shaped_random((20, 30), xp, dtype2, seed=1)
+        x1[x1 == 0] = 1
+        return f(x1, x2)
+
+    @testing.for_all_dtypes_combination(
+        names=('dtype1', 'dtype2'), no_bool=True, no_complex=True)
+    @testing.numpy_cupy_allclose(rtol=1e-5)
+    def test_vectorize_minmax(self, xp, dtype1, dtype2):
+        def my_minmax(x, y):
+            return max(x, y) - min(x, y)
+
+        f = xp.vectorize(my_minmax)
         x1 = testing.shaped_random((20, 30), xp, dtype1, seed=0)
         x2 = testing.shaped_random((20, 30), xp, dtype2, seed=1)
         x1[x1 == 0] = 1

@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 from setuptools import setup
 
 
-VERSION = '11.0.0'
+VERSION = '12.0.0b2'
 
 # List of packages supported by this version of CuPy.
 PACKAGES = [
@@ -124,6 +124,7 @@ def _get_cuda_version() -> Optional[int]:
 
     if sys.platform == 'linux':
         libnames = [
+            'libnvrtc.so.12',
             'libnvrtc.so.11.2',
             'libnvrtc.so.11.1',
             'libnvrtc.so.11.0',
@@ -131,6 +132,7 @@ def _get_cuda_version() -> Optional[int]:
         ]
     elif sys.platform == 'win32':
         libnames = [
+            'nvrtc64_120_0.dll',
             'nvrtc64_112_0.dll',
             'nvrtc64_111_0.dll',
             'nvrtc64_110_0.dll',

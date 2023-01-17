@@ -942,6 +942,18 @@ cdef class _ndarray_base:
         """
         return _sorting._ndarray_argpartition(self, kth, axis)
 
+    def searchsorted(self, v, side='left', sorter=None):
+        """Finds indices where elements of v should be inserted to maintain order.
+
+        For full documentation, see :func:`cupy.searchsorted`
+
+        Returns:
+
+        .. seealso:: :func:`numpy.searchsorted`
+
+        """
+        return cupy.searchsorted(self, v, side, sorter)
+
     cpdef tuple nonzero(self):
         """Return the indices of the elements that are non-zero.
 
@@ -1163,6 +1175,9 @@ cdef class _ndarray_base:
 
         """
         return _math._ndarray_cumprod(self, axis, dtype, out)
+
+    cpdef _ndarray_base _add_reduceat(self, indices, axis, dtype, out):
+        return _indexing._add_reduceat(self, indices, axis, dtype, out)
 
     cpdef _ndarray_base all(self, axis=None, out=None, keepdims=False):
         # TODO(niboshi): Write docstring
@@ -1596,7 +1611,11 @@ cdef class _ndarray_base:
             :func:`cupyx.scatter_add` for full documentation.
 
         """
-        _indexing._ndarray_scatter_add(self, slices, value)
+        warnings.warn(
+            '`ndarray.scatter_add` is deprecated. '
+            'Please use `cupy.add.at` instead.',
+            DeprecationWarning)
+        self._scatter_op(slices, value, 'add')
 
     def scatter_max(self, slices, value):
         """Stores a maximum value of elements specified by indices to an array.
@@ -1605,7 +1624,11 @@ cdef class _ndarray_base:
             :func:`cupyx.scatter_max` for full documentation.
 
         """
-        _indexing._ndarray_scatter_max(self, slices, value)
+        warnings.warn(
+            '`ndarray.scatter_max` is deprecated '
+            'Please use `cupy.maximum.at` instead.',
+            DeprecationWarning)
+        self._scatter_op(slices, value, 'max')
 
     def scatter_min(self, slices, value):
         """Stores a minimum value of elements specified by indices to an array.
@@ -1614,7 +1637,14 @@ cdef class _ndarray_base:
             :func:`cupyx.scatter_min` for full documentation.
 
         """
-        _indexing._ndarray_scatter_min(self, slices, value)
+        warnings.warn(
+            '`ndarray.scatter_min` is deprecated '
+            'Please use `cupy.minimum.at` instead.',
+            DeprecationWarning)
+        self._scatter_op(slices, value, 'min')
+
+    def _scatter_op(self, slices, value, op):
+        _indexing._scatter_op(self, slices, value, op)
 
     # TODO(okuta): Implement __getslice__
     # TODO(okuta): Implement __setslice__
@@ -2073,9 +2103,9 @@ cdef list cupy_header_list = [
     'cupy/complex.cuh',
     'cupy/carray.cuh',
     'cupy/atomics.cuh',
+    'cupy/math_constants.h',
 ]
 if _is_hip:
-    cupy_header_list.append('cupy/math_constants.h')
     cupy_header_list.append('cupy/hip_workaround.cuh')
 
 # expose to Python for unit testing
@@ -2205,8 +2235,11 @@ cpdef function.Module compile_with_cache(
         elif 11010 <= _cuda_runtime_version < 11020:
             bundled_include = 'cuda-11.1'
         elif 11020 <= _cuda_runtime_version < 12000:
-            # for CUDA Enhanced Compatibility
+            # CUDA Enhanced Compatibility
             bundled_include = 'cuda-11'
+        elif 12000 <= _cuda_runtime_version < 13000:
+            # CUDA Enhanced Compatibility
+            bundled_include = 'cuda-12'
         else:
             # CUDA versions not yet supported.
             bundled_include = None
@@ -2554,6 +2587,9 @@ cdef tuple _compute_concat_info_impl(obj):
     if isinstance(obj, (numpy.ndarray, ndarray)):
         return obj.shape, type(obj), obj.dtype
 
+    if hasattr(obj, '__cupy_get_ndarray__'):
+        return obj.shape, ndarray, obj.dtype
+
     if isinstance(obj, (list, tuple)):
         dim = len(obj)
         if dim == 0:
@@ -2775,3 +2811,19 @@ cdef _ndarray_base _create_ndarray_from_shape_strides(
     ptr = memory.alloc(end - begin) + begin
     return ndarray.__new__(
         subtype, shape, dtype, _obj=obj, memptr=ptr, strides=strides)
+
+
+cpdef min_scalar_type(a):
+    """
+    For scalar ``a``, returns the data type with the smallest size
+    and smallest scalar kind which can hold its value.  For non-scalar
+    array ``a``, returns the vector's dtype unmodified.
+
+    .. seealso:: :func:`numpy.min_scalar_type`
+    """
+    if isinstance(a, ndarray):
+        return a.dtype
+    _, concat_type, concat_dtype = _array_info_from_nested_sequence(a)
+    if concat_type is not None:
+        return concat_dtype
+    return numpy.min_scalar_type(a)

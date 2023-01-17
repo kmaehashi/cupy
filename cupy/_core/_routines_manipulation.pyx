@@ -17,7 +17,7 @@ from cupy._core cimport _routines_indexing as _indexing
 from cupy._core cimport core
 from cupy._core.core cimport _ndarray_base
 from cupy._core cimport internal
-from cupy._core._kernel cimport _check_peer_access
+from cupy._core._kernel cimport _check_peer_access, _preprocess_args
 
 from cupy.cuda import device
 
@@ -476,6 +476,7 @@ cpdef _ndarray_base broadcast_to(_ndarray_base array, shape):
         :meth:`numpy.broadcast_to`
 
     """
+    shape = tuple(shape) if numpy.iterable(shape) else (shape,)
     cdef int i, j, ndim = array._shape.size(), length = len(shape)
     cdef Py_ssize_t sh, a_sh
     if ndim > length:
@@ -594,7 +595,8 @@ cpdef _ndarray_base concatenate_method(
     if dtype is not None:
         dtype = get_dtype(dtype)
 
-    arrays = list(tup)
+    dev_id = device.get_device_id()
+    arrays = _preprocess_args(dev_id, tup, False)
 
     # Check if the input is not an empty sequence
     if len(arrays) == 0:

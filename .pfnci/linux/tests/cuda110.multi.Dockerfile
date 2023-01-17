@@ -14,9 +14,12 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
        && \
     apt-get -qqy install ccache git curl && \
     apt-get -qqy --allow-change-held-packages \
-            --allow-downgrades install 'libnccl2=2.9.*+cuda11.0' 'libnccl-dev=2.9.*+cuda11.0' 'libcutensor1=1.4.*' 'libcutensor-dev=1.4.*' 'libcudnn8=8.2.*+cuda11.4' 'libcudnn8-dev=8.2.*+cuda11.4'
+            --allow-downgrades install 'libnccl2=2.15.*+cuda11.0' 'libnccl-dev=2.15.*+cuda11.0' 'libcutensor1=1.4.*' 'libcutensor-dev=1.4.*' 'libcudnn8=8.2.*+cuda11.4' 'libcudnn8-dev=8.2.*+cuda11.4'
 
 ENV PATH "/usr/lib/ccache:${PATH}"
+
+COPY setup/update-alternatives-cutensor.sh /
+RUN /update-alternatives-cutensor.sh
 
 RUN git clone https://github.com/pyenv/pyenv.git /opt/pyenv
 ENV PYENV_ROOT "/opt/pyenv"
