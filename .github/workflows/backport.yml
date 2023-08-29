@@ -5,11 +5,12 @@ on:
     types: [closed, labeled]
     branches:
        - main
+       - fix-backport-wf
 
 jobs:
   backport:
     if: |
-        github.repository_owner == 'cupy' &&
+        github.repository_owner == 'kmaehashi' &&
         github.event.pull_request.merged == true &&
         (
             (github.event.action == 'closed'  && contains(github.event.pull_request.labels.*.name, 'to-be-backported')) ||
