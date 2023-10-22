@@ -257,7 +257,7 @@ def _jitify_prep(source, options, cu_path):
             'CUPY_DUMP_CUDA_SOURCE_ON_ERROR', False)
         if dump:
             cex.dump(sys.stderr)
-        raise JitifyException(str(cex))
+        raise JitifyException(str(cex)) from e
     assert name == cu_path
 
     return options, headers, include_names
@@ -457,15 +457,6 @@ def get_cache_dir():
 
 
 _empty_file_preprocess_cache: dict = {}
-
-
-def compile_with_cache(*args, **kwargs):
-    # TODO(asi1024): Remove in CuPy v13+.
-    warnings.warn(
-        'cupy.cuda.compile_with_cache has been deprecated in CuPy v10, and'
-        ' will be removed in the future. Use cupy.RawModule or cupy.RawKernel'
-        ' instead.', UserWarning)
-    return _compile_module_with_cache(*args, **kwargs)
 
 
 def _compile_module_with_cache(

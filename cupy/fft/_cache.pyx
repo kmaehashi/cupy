@@ -5,12 +5,10 @@ import warnings
 import weakref
 
 from cupy_backends.cuda.api cimport runtime
-from cupy.cuda cimport device
 
 import threading
 
 from cupy import _util
-from cupy.cuda import cufft
 
 
 #####################################################################
@@ -88,6 +86,8 @@ cdef class _Node:
         self.next = None
 
     def __repr__(self):
+        from cupy.cuda import cufft
+
         cdef str output
         cdef str plan_type = str(type(self.plan))
         if isinstance(self.plan, cufft.Plan1d):

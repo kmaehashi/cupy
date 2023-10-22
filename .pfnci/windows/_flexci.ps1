@@ -46,8 +46,10 @@ function ActivateCUDA($version) {
         $Env:CUDA_PATH = $Env:CUDA_PATH_V12_0
     } elseif ($version -eq "12.1") {
         $Env:CUDA_PATH = $Env:CUDA_PATH_V12_1
+    } elseif ($version -eq "12.2") {
+        $Env:CUDA_PATH = $Env:CUDA_PATH_V12_2
     } elseif ($version -eq "12.x") {
-        $Env:CUDA_PATH = $Env:CUDA_PATH_V12_1
+        $Env:CUDA_PATH = $Env:CUDA_PATH_V12_2
     } else {
         throw "Unsupported CUDA version: $version"
     }
@@ -59,6 +61,8 @@ function ActivateCuDNN($cudnn_version, $cuda_version) {
         $cudnn = "v8.6.0"
     } elseif ($cudnn_version -eq "8.8") {
         $cudnn = "v8.8.1"
+    } elseif ($cudnn_version -eq "8.9") {
+        $cudnn = "v8.9.3"
     } else {
         throw "Unsupported cuDNN version: $cudnn_version"
     }
@@ -97,4 +101,8 @@ function PrioritizeFlexCIDaemon() {
     if (-not $?) {
         throw "Failed to change priority of daemon (exit code = $LastExitCode)"
     }
+}
+
+function EnableLongPaths() {
+    Set-ItemProperty "Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" -Name LongPathsEnabled -value 1
 }
