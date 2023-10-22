@@ -30,7 +30,7 @@ jobs:
       contents: read
       security-events: write
     env:
-      READTHEDOCS: True  # to build CuPy without CUDA
+      READTHEDOCS: 'True'  # to build CuPy without CUDA
 
     steps:
     - name: Checkout repository
