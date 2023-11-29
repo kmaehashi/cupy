@@ -71,6 +71,7 @@ from cupyx.scipy.signal._iir_filter_conversions import lp2bs_zpk  # NOQA
 
 from cupyx.scipy.signal._iir_filter_conversions import zpk2tf  # NOQA
 from cupyx.scipy.signal._iir_filter_conversions import zpk2sos  # NOQA
+from cupyx.scipy.signal._iir_filter_conversions import zpk2ss   # NOQA
 from cupyx.scipy.signal._iir_filter_conversions import tf2zpk  # NOQA
 from cupyx.scipy.signal._iir_filter_conversions import tf2sos  # NOQA
 from cupyx.scipy.signal._iir_filter_conversions import tf2ss  # NOQA
@@ -153,8 +154,8 @@ from cupyx.scipy.signal._ltisys import dfreqresp  # NOQA
 from cupyx.scipy.signal._ltisys import StateSpace  # NOQA
 from cupyx.scipy.signal._ltisys import TransferFunction  # NOQA
 from cupyx.scipy.signal._ltisys import ZerosPolesGain  # NOQA
-
 from cupyx.scipy.signal._ltisys import cont2discrete  # NOQA
+from cupyx.scipy.signal._ltisys import place_poles  # NOQA
 
 from cupyx.scipy.signal._spectral import lombscargle  # NOQA
 from cupyx.scipy.signal._spectral import periodogram  # NOQA
@@ -164,6 +165,9 @@ from cupyx.scipy.signal._spectral import check_COLA  # NOQA
 from cupyx.scipy.signal._spectral import check_NOLA  # NOQA
 from cupyx.scipy.signal._spectral import stft  # NOQA
 from cupyx.scipy.signal._spectral import istft  # NOQA
+from cupyx.scipy.signal._spectral import spectrogram  # NOQA
+from cupyx.scipy.signal._spectral import vectorstrength  # NOQA
+from cupyx.scipy.signal._spectral import coherence  # NOQA
 
 from cupyx.scipy.signal._peak_finding import argrelextrema  # NOQA
 from cupyx.scipy.signal._peak_finding import argrelmin  # NOQA
