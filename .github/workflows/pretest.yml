@@ -1,6 +1,10 @@
 name: "Pre-review Tests"
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - admin/**
+  pull_request:
 
 jobs:
   static-checks:
@@ -43,7 +47,7 @@ jobs:
         pip install 'mypy==1.5.*' 'types-setuptools==57.4.14' 'pytest>=7.2'
         pytest -v tests/typing_tests/test_typing.py
 
-  build-cuda:
+  build-docs:
     runs-on: ubuntu-22.04
     env:
       CUPY_CI: GitHub
@@ -63,10 +67,10 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache
-        key: build-cuda-${{ github.sha }}
+        key: build-docs-${{ github.sha }}
         restore-keys: |
-          build-cuda-${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-          build-cuda-
+          build-docs-${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          build-docs-
 
     - name: Setup ccache
       run: |
@@ -90,18 +94,45 @@ jobs:
         SPHINXOPTS="-W --keep-going -j 4" make html
         popd
 
-    - name: Import Test
-      run: |
-        python -c 'import cupy, cupyx'
+  build-cuda:
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+    env:
+      CACHE_DIR: "/tmp/cache"
+      DOCKER_IMAGE: "ghcr.io/cupy/cupy-ci"
 
-        # Test lazy-imported CUDA Toolkit library.
-        rm cupy/cuda/cufft.*.so
-        rm cupy/random/_generator_api.*.so
-        rm cupy_backends/cuda/libs/cusolver.*.so
-        rm cupy_backends/cuda/libs/cusparse.*.so
-        rm cupy_backends/cuda/libs/curand.*.so
-        rm cupy_backends/cuda/libs/cublas.*.so
-        python -c 'import cupy, cupyx'
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.CACHE_DIR }}
+        key: build-cuda-${{ github.sha }}
+        restore-keys: |
+          build-cuda-${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          build-cuda-
+
+    - name: Log in to the GitHub Packages
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Build & Test
+      run: |
+        # Build CuPy with CUDA, then test that CuPy can be imported without CUDA.
+        ./.pfnci/linux/run.sh cuda-build build test
+
+    - name: Push Cache
+      if: github.event_name == 'push'
+      run: |
+        ./.pfnci/linux/run.sh cuda-build push
 
   build-rocm:
     runs-on: ubuntu-22.04
