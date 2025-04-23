@@ -9,6 +9,7 @@
   "hostRequirements": {
     "gpu": "optional"
   },
+  "onCreateCommand": ".devcontainer/on-create.sh",
   "customizations": {
     "vscode": {
       "extensions": [
