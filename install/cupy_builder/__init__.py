@@ -1,4 +1,9 @@
+import logging as _logging
 import typing as _typing
+
+logger = _logging.getLogger(__name__)
+logger.setLevel(_logging.DEBUG)
+
 
 # Legacy modules
 from cupy_builder import cupy_setup_build  # NOQA
