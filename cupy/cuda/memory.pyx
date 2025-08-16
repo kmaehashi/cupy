@@ -4,7 +4,6 @@ cimport cython  # NOQA
 
 import atexit
 import collections
-import gc
 import os
 import threading
 import warnings
@@ -26,6 +25,13 @@ from cupy_backends.cuda.api cimport runtime
 
 from cupy_backends.cuda.api.runtime import CUDARuntimeError
 from cupy import _util
+
+
+cdef extern from "Python.h":
+    Py_ssize_t PyGC_Collect()
+    int PyGC_Enable()
+    int PyGC_Disable()
+    int PyGC_IsEnabled()
 
 
 # cudaMalloc() is aligned to at least 512 bytes
@@ -1021,12 +1027,7 @@ cpdef inline size_t _bin_index_from_size(size_t size):
     return (size - 1) // ALLOCATION_UNIT_SIZE
 
 
-cdef _gc_isenabled = gc.isenabled
-cdef _gc_disable = gc.disable
-cdef _gc_enable = gc.enable
-
-
-cdef bint _lock_no_gc(lock):
+cdef inline bint _lock_no_gc(lock):
     """Lock to ensure single thread execution and no garbage collection.
 
     Returns:
@@ -1038,16 +1039,26 @@ cdef bint _lock_no_gc(lock):
     # (e.g., `__dealloc__` of PooledMemory class).
     # If the process is going to be terminated, the module itself may
     # already been unavailable.
-    if not _exit_mode and _gc_isenabled():
-        _gc_disable()
+    if not _exit_mode and PyGC_IsEnabled():
+        PyGC_Disable()
         return True
     return False
 
 
-cdef _unlock_no_gc(lock, bint gc_mode):
+cdef inline _unlock_no_gc(lock, bint gc_mode):
     if gc_mode:
-        _gc_enable()
+        PyGC_Enable()
     rlock.unlock_fastrlock(lock)
+
+
+cdef inline int _gc_collect():
+    if PyGC_IsEnabled() == 1:
+        PyGC_Collect()
+        return 0
+    PyGC_Enable()
+    PyGC_Collect()
+    PyGC_Disable()
+    return 0
 
 
 cdef class LockAndNoGc:
@@ -1504,7 +1515,7 @@ cdef class SingleDeviceMemoryPool:
                     self.free_all_blocks()
                     limit_ok = (self._total_bytes + size) <= limit
                 if not limit_ok:
-                    gc.collect()
+                    _gc_collect()
                     self.free_all_blocks()
                     limit_ok = (self._total_bytes + size) <= limit
                 if not limit_ok:
@@ -1524,7 +1535,7 @@ cdef class SingleDeviceMemoryPool:
             except CUDARuntimeError as e:
                 if e.status != runtime.errorMemoryAllocation:
                     raise
-                gc.collect()
+                _gc_collect()
                 self.free_all_blocks()
                 try:
                     mem = self._alloc(size).mem
