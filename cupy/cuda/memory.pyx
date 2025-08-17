@@ -1015,7 +1015,7 @@ cpdef inline size_t _round_size(size_t size):
     size = (size + ALLOCATION_UNIT_SIZE - 1) // ALLOCATION_UNIT_SIZE
     return size * ALLOCATION_UNIT_SIZE
 
-cpdef size_t _bin_index_from_size(size_t size):
+cpdef inline size_t _bin_index_from_size(size_t size):
     """Returns appropriate bins index from the memory size."""
     # avoid 0 div checking
     return (size - 1) // ALLOCATION_UNIT_SIZE
