@@ -190,12 +190,19 @@ main() {
         echo "  - To persist build/kernel cache across multiple shell session runs: "
         echo "    set CACHE_DIR env var BEFORE starting run.sh"
         echo "======================================================================="
-        uid_gid="$(id -u):$(id -g)"
+        docker_args+=(
+          --tty
+          --env "USER=cupy-user"
+          --env "HOME=/home/cupy-user"
+          --env "SHELL_MODE=yes"
+          --user "$(id -u):$(id -g)"
+        )
+        for group in $(id -G); do
+          docker_args+=(--group-add "${group}")
+        done
         set -x
         "${docker_args[@]}" --volume="${repo_root}:${repo_root}:rw" --workdir "${repo_root}" \
-            --tty --user "${uid_gid}" \
-            --env "USER=cupy-user" --env "HOME=/home/cupy-user" --env "SHELL_MODE=yes" \
-            "${docker_image}" /bin/bash -c "source ${repo_root}/.pfnci/linux/tests/actions/_environment.sh && exec bash"
+            "${docker_image}" bash -c "source ${repo_root}/.pfnci/linux/tests/actions/_environment.sh && exec bash"
       fi
       ;;
     * )
