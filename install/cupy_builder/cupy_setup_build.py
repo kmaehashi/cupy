@@ -357,6 +357,8 @@ def make_extensions(ctx: Context, compiler, use_cython):
         settings['define_macros'].append(
             ('THRUST_DEVICE_SYSTEM', 'THRUST_DEVICE_SYSTEM_HIP'))
     settings['define_macros'].append(('CUPY_CACHE_KEY', ctx.cupy_cache_key))
+    settings['define_macros'].append(
+        ('Py_LIMITED_API', 0x030B0000))  # Python 3.11
 
     try:
         host_compiler = compiler
@@ -486,7 +488,8 @@ def make_extensions(ctx: Context, compiler, use_cython):
                 args.append(ldflag)
 
             sources = module_extension_sources(f, use_cython, no_cuda)
-            extension = setuptools.Extension(name, sources, **s_file)
+            extension = setuptools.Extension(
+                name, sources, py_limited_api=True, **s_file)
             ret.append(extension)
 
     if ctx.dev_configure_cache:
