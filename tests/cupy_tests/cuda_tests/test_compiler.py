@@ -150,12 +150,7 @@ class TestCacheDebug(unittest.TestCase):
         # Save original environment
         self.original_env = os.environ.get('CUPY_CACHE_DEBUG')
         # Reset the tracker for each test
-        compiler._cache_debug_tracker._initialized = False
-        compiler._cache_debug_tracker._mode = None
-        compiler._cache_debug_tracker._output_path = None
-        compiler._cache_debug_tracker._records = []
-        compiler._cache_debug_tracker._hit_count = 0
-        compiler._cache_debug_tracker._miss_count = 0
+        compiler._cache_debug_tracker.reset()
 
     def tearDown(self):
         # Restore original environment
@@ -164,12 +159,7 @@ class TestCacheDebug(unittest.TestCase):
         else:
             os.environ['CUPY_CACHE_DEBUG'] = self.original_env
         # Reset the tracker after each test
-        compiler._cache_debug_tracker._initialized = False
-        compiler._cache_debug_tracker._mode = None
-        compiler._cache_debug_tracker._output_path = None
-        compiler._cache_debug_tracker._records = []
-        compiler._cache_debug_tracker._hit_count = 0
-        compiler._cache_debug_tracker._miss_count = 0
+        compiler._cache_debug_tracker.reset()
 
     def test_cache_debug_disabled_by_default(self):
         """Test that cache debug is disabled by default (zero overhead)."""
@@ -273,12 +263,7 @@ class TestCacheDebug(unittest.TestCase):
             os.environ['CUPY_CACHE_DEBUG'] = f'debug:{output_file}'
             
             # Reset tracker to ensure fresh state
-            compiler._cache_debug_tracker._initialized = False
-            compiler._cache_debug_tracker._mode = None
-            compiler._cache_debug_tracker._output_path = None
-            compiler._cache_debug_tracker._records = []
-            compiler._cache_debug_tracker._hit_count = 0
-            compiler._cache_debug_tracker._miss_count = 0
+            compiler._cache_debug_tracker.reset()
             
             # First compilation - should be a cache miss
             source = '__global__ void test_kernel() {}'

@@ -48,36 +48,47 @@ class _CacheDebugTracker:
         self._initialized = False
     
     def initialize(self):
-        """Initialize from environment variable CUPY_CACHE_DEBUG."""
+        """Initialize from environment variable CUPY_CACHE_DEBUG.
+        
+        Uses double-checked locking for thread-safe initialization.
+        """
+        # First check without lock (fast path)
         if self._initialized:
             return
         
-        self._initialized = True
-        debug_mode = os.environ.get('CUPY_CACHE_DEBUG', '').strip()
-        
-        if not debug_mode:
-            return
-        
-        # Parse mode:path format (e.g., "stats:/path/to/file.json")
-        if ':' in debug_mode:
-            mode, path = debug_mode.split(':', 1)
-            self._mode = mode.lower()
-            self._output_path = path
-        else:
-            # Just mode specified, use default path
-            self._mode = debug_mode.lower()
-            self._output_path = 'cupy_cache_debug.json'
-        
-        if self._mode not in ('stats', 'debug'):
-            warnings.warn(
-                f'Invalid CUPY_CACHE_DEBUG mode: {self._mode}. '
-                'Valid modes are "stats" or "debug".',
-                RuntimeWarning)
-            self._mode = None
-            return
-        
-        # Register atexit handler to write results
-        atexit.register(self._write_results)
+        # Second check with lock (ensures only one thread initializes)
+        with self._lock:
+            if self._initialized:
+                return
+            
+            debug_mode = os.environ.get('CUPY_CACHE_DEBUG', '').strip()
+            
+            if not debug_mode:
+                self._initialized = True
+                return
+            
+            # Parse mode:path format (e.g., "stats:/path/to/file.json")
+            if ':' in debug_mode:
+                mode, path = debug_mode.split(':', 1)
+                self._mode = mode.lower()
+                self._output_path = path
+            else:
+                # Just mode specified, use default path
+                self._mode = debug_mode.lower()
+                self._output_path = 'cupy_cache_debug.json'
+            
+            if self._mode not in ('stats', 'debug'):
+                warnings.warn(
+                    f'Invalid CUPY_CACHE_DEBUG mode: {self._mode}. '
+                    'Valid modes are "stats" or "debug".',
+                    RuntimeWarning)
+                self._mode = None
+                self._initialized = True
+                return
+            
+            # Register atexit handler to write results
+            atexit.register(self._write_results)
+            self._initialized = True
     
     def record_hit(self, hashed_key=None, key_src=None):
         """Record a cache hit."""
@@ -146,13 +157,23 @@ class _CacheDebugTracker:
                         'records': self._records,
                     }
                 
-                with open(self._output_path, 'w') as f:
+                with open(self._output_path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=2)
         except Exception as e:
             # Don't fail the program if we can't write debug info
             warnings.warn(
                 f'Failed to write cache debug info to {self._output_path}: {e}',
                 RuntimeWarning)
+    
+    def reset(self):
+        """Reset tracker state. Primarily for testing purposes."""
+        with self._lock:
+            self._initialized = False
+            self._mode = None
+            self._output_path = None
+            self._records = []
+            self._hit_count = 0
+            self._miss_count = 0
 
 
 _cache_debug_tracker = _CacheDebugTracker()
