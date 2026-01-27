@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import atexit
 import copy
 import hashlib
+import json
 import math
 import os
 import platform
@@ -10,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import warnings
 
 from cupy.cuda import device
@@ -29,6 +32,130 @@ _win32 = sys.platform.startswith('win32')
 _rdc_flags = ('--device-c', '-dc', '-rdc=true',
               '--relocatable-device-code=true')
 _cudadevrt = None
+
+
+# Cache debug tracking
+class _CacheDebugTracker:
+    """Track cache hit/miss for debugging purposes."""
+    
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._mode = None  # None, 'stats', or 'debug'
+        self._output_path = None
+        self._records = []
+        self._hit_count = 0
+        self._miss_count = 0
+        self._initialized = False
+    
+    def initialize(self):
+        """Initialize from environment variable CUPY_CACHE_DEBUG."""
+        if self._initialized:
+            return
+        
+        self._initialized = True
+        debug_mode = os.environ.get('CUPY_CACHE_DEBUG', '').strip()
+        
+        if not debug_mode:
+            return
+        
+        # Parse mode:path format (e.g., "stats:/path/to/file.json")
+        if ':' in debug_mode:
+            mode, path = debug_mode.split(':', 1)
+            self._mode = mode.lower()
+            self._output_path = path
+        else:
+            # Just mode specified, use default path
+            self._mode = debug_mode.lower()
+            self._output_path = 'cupy_cache_debug.json'
+        
+        if self._mode not in ('stats', 'debug'):
+            warnings.warn(
+                f'Invalid CUPY_CACHE_DEBUG mode: {self._mode}. '
+                'Valid modes are "stats" or "debug".',
+                RuntimeWarning)
+            self._mode = None
+            return
+        
+        # Register atexit handler to write results
+        atexit.register(self._write_results)
+    
+    def record_hit(self, hashed_key=None, key_src=None):
+        """Record a cache hit."""
+        if self._mode is None:
+            return
+        
+        with self._lock:
+            self._hit_count += 1
+            if self._mode == 'debug':
+                record = {
+                    'type': 'hit',
+                    'hashed_key': hashed_key,
+                }
+                # Include full key only in debug mode
+                if key_src is not None:
+                    record['cache_key'] = key_src
+                self._records.append(record)
+    
+    def record_miss(self, hashed_key=None, key_src=None):
+        """Record a cache miss."""
+        if self._mode is None:
+            return
+        
+        with self._lock:
+            self._miss_count += 1
+            if self._mode == 'debug':
+                record = {
+                    'type': 'miss',
+                    'hashed_key': hashed_key,
+                }
+                # Include full key only in debug mode
+                if key_src is not None:
+                    record['cache_key'] = key_src
+                self._records.append(record)
+    
+    def _write_results(self):
+        """Write results to JSON file (called at exit)."""
+        if self._mode is None or self._output_path is None:
+            return
+        
+        try:
+            with self._lock:
+                if self._mode == 'stats':
+                    # Stats mode: only hit/miss counts and ratio
+                    total = self._hit_count + self._miss_count
+                    ratio = self._hit_count / total if total > 0 else 0.0
+                    data = {
+                        'mode': 'stats',
+                        'cache_hits': self._hit_count,
+                        'cache_misses': self._miss_count,
+                        'total_lookups': total,
+                        'hit_ratio': ratio,
+                    }
+                else:
+                    # Debug mode: full records plus summary
+                    total = self._hit_count + self._miss_count
+                    ratio = self._hit_count / total if total > 0 else 0.0
+                    data = {
+                        'mode': 'debug',
+                        'summary': {
+                            'cache_hits': self._hit_count,
+                            'cache_misses': self._miss_count,
+                            'total_lookups': total,
+                            'hit_ratio': ratio,
+                        },
+                        'records': self._records,
+                    }
+                
+                with open(self._output_path, 'w') as f:
+                    json.dump(data, f, indent=2)
+        except Exception as e:
+            # Don't fail the program if we can't write debug info
+            warnings.warn(
+                f'Failed to write cache debug info to {self._output_path}: {e}',
+                RuntimeWarning)
+
+
+_cache_debug_tracker = _CacheDebugTracker()
 
 
 class NVCCException(Exception):
@@ -541,6 +668,10 @@ def _compile_with_cache_cuda(
         log_stream=None, cache_in_memory=False, jitify=False, to_ltoir=False):
     # NVRTC does not use extra_source. extra_source is used for cache key.
     global _empty_file_preprocess_cache
+    
+    # Initialize cache debug tracker (zero overhead when disabled)
+    _cache_debug_tracker.initialize()
+    
     if cache_dir is None:
         cache_dir = get_cache_dir()
     if arch is None:
@@ -611,6 +742,10 @@ def _compile_with_cache_cuda(
                 cubin = data[_hash_length:]
                 cubin_hash = _hash_hexdigest(cubin).encode('ascii')
                 if hash == cubin_hash:
+                    # Cache hit
+                    _cache_debug_tracker.record_hit(
+                        hashed_key=name,
+                        key_src=key_src.decode('utf-8', errors='replace'))
                     if to_ltoir:
                         return cubin
                     else:
@@ -620,6 +755,11 @@ def _compile_with_cache_cuda(
         # Enforce compiling -- the resulting kernel will be cached elsewhere,
         # so we do nothing
         pass
+
+    # Cache miss - need to compile
+    _cache_debug_tracker.record_miss(
+        hashed_key=name,
+        key_src=key_src.decode('utf-8', errors='replace'))
 
     if backend == 'nvrtc':
         cu_name = '' if cache_in_memory else name + '.cu'
@@ -897,6 +1037,9 @@ def _compile_with_cache_hip(source, options, arch, cache_dir, extra_source,
                             log_stream=None, cache_in_memory=False,
                             use_converter=True):
     global _empty_file_preprocess_cache
+    
+    # Initialize cache debug tracker (zero overhead when disabled)
+    _cache_debug_tracker.initialize()
 
     # TODO(leofang): this might be possible but is currently undocumented
     if _is_cudadevrt_needed(options):
@@ -964,12 +1107,21 @@ def _compile_with_cache_hip(source, options, arch, cache_dir, extra_source,
                 binary = data[_hash_length:]
                 binary_hash = _hash_hexdigest(binary).encode('ascii')
                 if hash_value == binary_hash:
+                    # Cache hit
+                    _cache_debug_tracker.record_hit(
+                        hashed_key=name,
+                        key_src=key_src.decode('utf-8', errors='replace'))
                     mod.load(binary)
                     return mod
     else:
         # Enforce compiling -- the resulting kernel will be cached elsewhere,
         # so we do nothing
         pass
+
+    # Cache miss - need to compile
+    _cache_debug_tracker.record_miss(
+        hashed_key=name,
+        key_src=key_src.decode('utf-8', errors='replace'))
 
     if backend == 'hiprtc':
         # compile_using_nvrtc calls hiprtc for hip builds
