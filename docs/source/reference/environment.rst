@@ -36,6 +36,28 @@ Here are the environment variables that CuPy uses at runtime.
   If set to ``1``, :envvar:`CUPY_CACHE_DIR` and :envvar:`CUPY_CACHE_SAVE_CUDA_SOURCE` will be ignored, and the cache is in memory.
   This environment variable allows reducing disk I/O, but is ignoed when ``nvcc`` is set to be the compiler backend.
 
+.. envvar:: CUPY_CACHE_DEBUG
+
+  Default: Not set
+
+  If set, enables cache hit/miss tracking for debugging purposes.
+  The format is ``<mode>:<path>`` where ``<mode>`` is either ``stats`` or ``debug``, and ``<path>`` is the output JSON file path.
+  If only the mode is specified (e.g., ``stats``), the default output path ``cupy_cache_debug.json`` is used.
+
+  * ``stats`` mode: Records only cache hit/miss counts and hit ratio. Minimal overhead.
+  * ``debug`` mode: Records full details including hashed cache keys, cache keys, and individual hit/miss events.
+
+  Example usage::
+
+    # Stats mode with custom path
+    export CUPY_CACHE_DEBUG=stats:/tmp/cache_stats.json
+
+    # Debug mode with default path
+    export CUPY_CACHE_DEBUG=debug
+
+  The JSON output will be written when the program exits.
+  When not set, this feature has zero overhead.
+
 .. envvar:: CUPY_DISABLE_JITIFY_CACHE
 
   Default: ``0``
