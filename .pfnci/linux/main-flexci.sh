@@ -10,11 +10,22 @@ LOG_FILE="/tmp/log.txt"
 echo "Environment Variables:"
 env
 
+# Extract pull-request ID
 pull_req=""
+reuse_pull_req_cache=""
 if [[ "${FLEXCI_BRANCH:-}" == refs/pull/* ]]; then
-    # Extract pull-request ID
     pull_req="$(echo "${FLEXCI_BRANCH}" | cut -d/ -f3)"
     echo "Testing Pull-Request: #${pull_req}"
+elif [[ "${FLEXCI_BRANCH:-}" == refs/heads/* ]]; then
+    # FLEXCI_SUB_DESCRIPTION="Merge pull request #1234"
+    reuse_pull_req_cache="$(echo "${FLEXCI_SUB_DESCRIPTION:-}" | cut -d '#' -f2)"
+    if [[ ${reuse_pull_req_cache} =~ ^[0-9]+$ ]]; then
+      echo "Testing Branch ${FLEXCI_BRANCH} - Triggered by Merged Pull-Request #${reuse_pull_req_cache}"
+    else
+      # This should not happen, but just in case.
+      reuse_pull_req_cache=""
+      echo "Testing Branch ${FLEXCI_BRANCH} - Triggered by: ${FLEXCI_SUB_DESCRIPTION:-(unknown)}"
+    fi
 fi
 
 .pfnci/linux/update-cuda-driver.sh
@@ -28,7 +39,7 @@ STAGES="cache_get build test"
 if [[ "${TARGET}" == "benchmark" ]]; then
     STAGES="cache_get build benchmark"
 fi
-BENCHMARK_DIR=/tmp/benchmark CACHE_DIR=/tmp/cupy_cache PULL_REQUEST="${pull_req}" "$(dirname ${0})/run.sh" "${TARGET}" "${STAGES}" 2>&1 | tee "${LOG_FILE}"
+BENCHMARK_DIR=/tmp/benchmark CACHE_DIR=/tmp/cupy_cache PULL_REQUEST="${pull_req}" REUSE_PULL_REQUEST_CACHE="${reuse_pull_req_cache}" "$(dirname ${0})/run.sh" "${TARGET}" "${STAGES}" 2>&1 | tee "${LOG_FILE}"
 test_retval=${PIPESTATUS[0]}
 
 echo "****************************************************************************************************"
@@ -42,7 +53,7 @@ if [[ "${pull_req}" == "" ]]; then
 
     # Notify.
     if [[ ${test_retval} != 0 ]]; then
-        pip3 install -q slack-sdk gitterpy
+        pip3 install -q slack-sdk
         ./.pfnci/flexci_notify.py "TEST FAILED"
     fi
 else

@@ -22,6 +22,8 @@ Environment variables:
 
 - PULL_REQUEST: ID of the pull-request to test; should be empty when testing
                 a branch.
+- REUSE_PULL_REQUEST_CACHE: ID of the merged (trusted) pull-request; the cache
+                            for the PR will be merged into the one for branch.
 - GPU: Number of GPUs available for testing.
 - CACHE_DIR: Path to the local directory to store cache files.
 - CACHE_GCS_DIR: Path to the GCS directory to store a cache archive.
@@ -53,7 +55,14 @@ main() {
   docker_cache_from="${docker_image}"
   cache_archive="linux-${TARGET}-${base_branch}.tar.gz"
   cache_gcs_dir="${CACHE_GCS_DIR:-gs://tmp-asia-pfn-public-ci/cupy-ci/cache}"
-  cache_pr_gcs_dir="${cache_gcs_dir}-pr-${PULL_REQUEST:-0}"
+
+  if [[ "${PULL_REQUEST:-0}" != "0" ]]; then
+    cache_pr_gcs_dir="${cache_gcs_dir}-pr-${PULL_REQUEST}"
+  elif [[ "${REUSE_PULL_REQUEST_CACHE:-0}" != "0" ]]; then
+    cache_pr_gcs_dir="${cache_gcs_dir}-pr-${REUSE_PULL_REQUEST_CACHE}"
+  else
+   cache_pr_gcs_dir=""
+  fi
 
   if [[ "${DOCKER_IMAGE_CACHE:-1}" = "0" ]]; then
     docker_cache_from=""
@@ -110,7 +119,7 @@ main() {
         du -h "${cache_archive}" &&
         tar -x -f "${cache_archive}" -C "${CACHE_DIR}" &&
         rm -f "${cache_archive}" || echo "WARNING: Remote cache could not be retrieved."
-      if [[ "${PULL_REQUEST:-0}" != "0" ]]; then
+      if [[ "${cache_pr_gcs_dir}" != "" ]]; then
         gsutil_with_retry -m -q cp "${cache_pr_gcs_dir}/${cache_archive}" . &&
           du -h "${cache_archive}" &&
           tar -x -f "${cache_archive}" -C "${CACHE_DIR}" &&
