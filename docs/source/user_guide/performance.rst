@@ -94,44 +94,6 @@ Testing with CI/CD
 When running CI/CD to test CuPy or any downstream packages that heavily rely on CuPy, depending on the use cases the developers/users may find that JIT compilation takes a non-negligible amount of time. To accelerate testing, it is advised to store the artifacts generated under the cache directory (see the above section) in a persistent location (say, a cloud storage) after the test is finished, regardless of success or failure, so that the artifacts can be re-used across runs, avoiding JIT'ing kernels at test time.
 
 
-Debugging Cache Issues
-----------------------
-
-In CI/CD environments or other situations where you suspect cache is not working as expected (e.g., unexpectedly low hit rates), you can use the :envvar:`CUPY_CACHE_DEBUG` environment variable to diagnose cache behavior.
-
-There are two debugging modes:
-
-**Stats Mode** (lightweight)
-  Records only the cache hit/miss counts and hit ratio. This mode has minimal overhead and is suitable for production diagnostics::
-
-    export CUPY_CACHE_DEBUG=stats:/tmp/cache_stats.json
-    python your_script.py
-
-  The resulting JSON file will contain::
-
-    {
-      "mode": "stats",
-      "cache_hits": 150,
-      "cache_misses": 50,
-      "total_lookups": 200,
-      "hit_ratio": 0.75
-    }
-
-**Debug Mode** (detailed)
-  Records full details including hashed cache keys, original cache keys, and individual hit/miss events. This mode is useful for identifying which specific kernels are missing from cache::
-
-    export CUPY_CACHE_DEBUG=debug:/tmp/cache_debug.json
-    python your_script.py
-
-  The resulting JSON file will contain detailed records for each cache lookup, allowing you to identify patterns in cache misses and understand why certain kernels are not being cached or reused.
-
-If you don't specify a path, the default output file ``cupy_cache_debug.json`` will be used in the current directory::
-
-    export CUPY_CACHE_DEBUG=stats
-
-The output is written when the program exits. When :envvar:`CUPY_CACHE_DEBUG` is not set, this feature has zero overhead.
-
-
 In-depth profiling
 ------------------
 

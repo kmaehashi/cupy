@@ -150,7 +150,7 @@ class TestCacheDebug(unittest.TestCase):
         # Save original environment
         self.original_env = os.environ.get('CUPY_CACHE_DEBUG')
         # Reset the tracker for each test
-        compiler._cache_debug_tracker.reset()
+        compiler._cache_tracker.reset()
 
     def tearDown(self):
         # Restore original environment
@@ -159,42 +159,42 @@ class TestCacheDebug(unittest.TestCase):
         else:
             os.environ['CUPY_CACHE_DEBUG'] = self.original_env
         # Reset the tracker after each test
-        compiler._cache_debug_tracker.reset()
+        compiler._cache_tracker.reset()
 
     def test_cache_debug_disabled_by_default(self):
         """Test that cache debug is disabled by default (zero overhead)."""
         os.environ.pop('CUPY_CACHE_DEBUG', None)
-        compiler._cache_debug_tracker.initialize()
-        assert compiler._cache_debug_tracker._mode is None
+        compiler._cache_tracker.initialize()
+        assert compiler._cache_tracker._mode is None
 
         # Recording should be no-op
-        compiler._cache_debug_tracker.record_hit('key1')
-        compiler._cache_debug_tracker.record_miss('key2')
-        assert compiler._cache_debug_tracker._hit_count == 0
-        assert compiler._cache_debug_tracker._miss_count == 0
+        compiler._cache_tracker.record_hit('key1')
+        compiler._cache_tracker.record_miss('key2')
+        assert compiler._cache_tracker._hit_count == 0
+        assert compiler._cache_tracker._miss_count == 0
 
     def test_cache_debug_stats_mode(self):
         """Test stats mode that only tracks hit/miss counts."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_file = os.path.join(tmpdir, 'stats.json')
             os.environ['CUPY_CACHE_DEBUG'] = f'stats:{output_file}'
-            
+
             # Initialize and record some hits/misses
-            compiler._cache_debug_tracker.initialize()
-            assert compiler._cache_debug_tracker._mode == 'stats'
-            
-            compiler._cache_debug_tracker.record_hit('key1', 'src1')
-            compiler._cache_debug_tracker.record_hit('key2', 'src2')
-            compiler._cache_debug_tracker.record_miss('key3', 'src3')
-            
+            compiler._cache_tracker.initialize()
+            assert compiler._cache_tracker._mode == 'stats'
+
+            compiler._cache_tracker.record_hit('key1', 'src1')
+            compiler._cache_tracker.record_hit('key2', 'src2')
+            compiler._cache_tracker.record_miss('key3', 'src3')
+
             # Write results
-            compiler._cache_debug_tracker._write_results()
-            
+            compiler._cache_tracker._write_results()
+
             # Verify output file
             assert os.path.exists(output_file)
-            with open(output_file, 'r') as f:
+            with open(output_file) as f:
                 data = json.load(f)
-            
+
             assert data['mode'] == 'stats'
             assert data['cache_hits'] == 2
             assert data['cache_misses'] == 1
@@ -208,29 +208,29 @@ class TestCacheDebug(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_file = os.path.join(tmpdir, 'debug.json')
             os.environ['CUPY_CACHE_DEBUG'] = f'debug:{output_file}'
-            
+
             # Initialize and record some hits/misses
-            compiler._cache_debug_tracker.initialize()
-            assert compiler._cache_debug_tracker._mode == 'debug'
-            
-            compiler._cache_debug_tracker.record_hit('hash1', 'source1')
-            compiler._cache_debug_tracker.record_miss('hash2', 'source2')
-            compiler._cache_debug_tracker.record_hit('hash3', 'source3')
-            
+            compiler._cache_tracker.initialize()
+            assert compiler._cache_tracker._mode == 'debug'
+
+            compiler._cache_tracker.record_hit('hash1', 'source1')
+            compiler._cache_tracker.record_miss('hash2', 'source2')
+            compiler._cache_tracker.record_hit('hash3', 'source3')
+
             # Write results
-            compiler._cache_debug_tracker._write_results()
-            
+            compiler._cache_tracker._write_results()
+
             # Verify output file
             assert os.path.exists(output_file)
-            with open(output_file, 'r') as f:
+            with open(output_file) as f:
                 data = json.load(f)
-            
+
             assert data['mode'] == 'debug'
             assert data['summary']['cache_hits'] == 2
             assert data['summary']['cache_misses'] == 1
             assert data['summary']['total_lookups'] == 3
             assert abs(data['summary']['hit_ratio'] - 2/3) < 0.001
-            
+
             # Debug mode should include records
             assert 'records' in data
             assert len(data['records']) == 3
@@ -244,16 +244,16 @@ class TestCacheDebug(unittest.TestCase):
     def test_cache_debug_default_path(self):
         """Test that default path is used when only mode is specified."""
         os.environ['CUPY_CACHE_DEBUG'] = 'stats'
-        compiler._cache_debug_tracker.initialize()
-        assert compiler._cache_debug_tracker._mode == 'stats'
-        assert compiler._cache_debug_tracker._output_path == 'cupy_cache_debug.json'
+        compiler._cache_tracker.initialize()
+        assert compiler._cache_tracker._mode == 'stats'
+        assert compiler._cache_tracker._output_path == 'cupy_cache_debug.json'
 
     def test_cache_debug_invalid_mode(self):
         """Test that invalid mode triggers a warning."""
         os.environ['CUPY_CACHE_DEBUG'] = 'invalid_mode'
         with self.assertWarns(RuntimeWarning):
-            compiler._cache_debug_tracker.initialize()
-        assert compiler._cache_debug_tracker._mode is None
+            compiler._cache_tracker.initialize()
+        assert compiler._cache_tracker._mode is None
 
     def test_cache_debug_with_actual_compilation(self):
         """Test cache debug with actual compilation to ensure integration."""
@@ -261,29 +261,30 @@ class TestCacheDebug(unittest.TestCase):
             cache_dir = os.path.join(tmpdir, 'cache')
             output_file = os.path.join(tmpdir, 'debug.json')
             os.environ['CUPY_CACHE_DEBUG'] = f'debug:{output_file}'
-            
+
             # Reset tracker to ensure fresh state
-            compiler._cache_debug_tracker.reset()
-            
+            compiler._cache_tracker.reset()
+
             # First compilation - should be a cache miss
             source = '__global__ void test_kernel() {}'
-            mod1 = compiler._compile_module_with_cache(
+            compiler._compile_module_with_cache(
                 source, cache_dir=cache_dir)
-            
+
             # Second compilation with same source - should be a cache hit
-            mod2 = compiler._compile_module_with_cache(
+            compiler._compile_module_with_cache(
                 source, cache_dir=cache_dir)
-            
+
             # Write results
-            compiler._cache_debug_tracker._write_results()
-            
+            compiler._cache_tracker._write_results()
+
             # Verify results
             assert os.path.exists(output_file)
-            with open(output_file, 'r') as f:
+            with open(output_file) as f:
                 data = json.load(f)
-            
-            assert data['mode'] == 'debug'
-            assert data['summary']['cache_misses'] >= 1  # At least first compilation
-            assert data['summary']['cache_hits'] >= 1    # At least second compilation
-            assert len(data['records']) >= 2
 
+            assert data['mode'] == 'debug'
+            # At least first compilation
+            assert data['summary']['cache_misses'] >= 1
+            # At least second compilation
+            assert data['summary']['cache_hits'] >= 1
+            assert len(data['records']) >= 2
