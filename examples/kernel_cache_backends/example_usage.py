@@ -1,0 +1,222 @@
+"""
+Example demonstrating the use of custom cache backends for CuPy kernels.
+
+This example shows how to:
+1. Use the default DiskCacheBackend
+2. Create and use a GCPStorageCacheBackend
+3. Implement a simple custom cache backend
+
+Note: This is an experimental feature. The API may change in future releases.
+"""
+
+import os
+import tempfile
+import warnings
+
+
+def example_disk_backend():
+    """Example using the built-in disk cache backend."""
+    print("\n=== Example 1: Disk Cache Backend ===")
+    
+    try:
+        from cupy.cuda.compiler import DiskCacheBackend
+    except ImportError:
+        print("CuPy is not installed or cache backend is not available.")
+        return
+    
+    # Create a disk cache backend with a custom directory
+    cache_dir = tempfile.mkdtemp(prefix='cupy_cache_example_')
+    backend = DiskCacheBackend(cache_dir=cache_dir)
+    
+    print(f"Cache directory: {cache_dir}")
+    
+    # Demonstrate the backend interface
+    test_name = "test_kernel.cubin"
+    test_data = b"hash1234" + b"compiled_kernel_binary_data"
+    
+    # Save data
+    print(f"Saving test data to cache...")
+    backend.save(test_name, test_data)
+    
+    # Check existence
+    print(f"Checking if '{test_name}' exists: {backend.exists(test_name)}")
+    
+    # Load data
+    loaded_data = backend.load(test_name)
+    print(f"Loaded data matches saved data: {loaded_data == test_data}")
+    
+    print(f"\nCache directory contains: {os.listdir(cache_dir)}")
+
+
+def example_gcp_backend():
+    """Example using the GCP Storage cache backend."""
+    print("\n=== Example 2: GCP Storage Cache Backend ===")
+    
+    try:
+        from examples.kernel_cache_backends.gcp_storage_backend import (
+            GCPStorageCacheBackend
+        )
+    except ImportError as e:
+        print(f"Failed to import GCP backend: {e}")
+        return
+    
+    # Create a GCP cache backend
+    # Note: This requires a valid GCP bucket and credentials
+    bucket_name = os.environ.get('CUPY_GCP_BUCKET', 'cupy-kernel-cache-example')
+    
+    print(f"Creating GCP backend with bucket: {bucket_name}")
+    print("Note: This requires valid GCP credentials and an existing bucket.")
+    
+    try:
+        backend = GCPStorageCacheBackend(
+            bucket_name=bucket_name,
+            local_cache_dir=tempfile.mkdtemp(prefix='cupy_gcp_cache_'),
+            prefix='examples/'
+        )
+        
+        # The backend automatically falls back to local cache if GCP is unavailable
+        test_name = "example_kernel.cubin"
+        test_data = b"hash5678" + b"another_compiled_kernel"
+        
+        print(f"Saving test data...")
+        backend.save(test_name, test_data)
+        
+        print(f"Checking if '{test_name}' exists: {backend.exists(test_name)}")
+        
+        loaded_data = backend.load(test_name)
+        print(f"Loaded data matches saved data: {loaded_data == test_data}")
+        
+    except Exception as e:
+        print(f"Error with GCP backend: {e}")
+        print("The backend will fall back to local disk cache.")
+
+
+def example_custom_backend():
+    """Example implementing a simple in-memory cache backend."""
+    print("\n=== Example 3: Custom In-Memory Cache Backend ===")
+    
+    try:
+        from cupy.cuda.compiler import CacheBackend
+    except ImportError:
+        print("CuPy is not installed or cache backend is not available.")
+        return
+    
+    class InMemoryCacheBackend(CacheBackend):
+        """Simple in-memory cache backend for demonstration."""
+        
+        def __init__(self):
+            self._cache = {}
+        
+        def load(self, name):
+            return self._cache.get(name)
+        
+        def save(self, name, data):
+            self._cache[name] = data
+        
+        def exists(self, name):
+            return name in self._cache
+    
+    # Create and use the in-memory backend
+    backend = InMemoryCacheBackend()
+    
+    test_name = "memory_kernel.cubin"
+    test_data = b"hash9999" + b"in_memory_kernel"
+    
+    print("Saving test data to in-memory cache...")
+    backend.save(test_name, test_data)
+    
+    print(f"Checking if '{test_name}' exists: {backend.exists(test_name)}")
+    
+    loaded_data = backend.load(test_name)
+    print(f"Loaded data matches saved data: {loaded_data == test_data}")
+
+
+def example_with_real_kernel():
+    """Example using a cache backend with a real CuPy kernel compilation."""
+    print("\n=== Example 4: Real Kernel Compilation with Custom Backend ===")
+    
+    try:
+        import cupy
+        from cupy.cuda import compiler
+        from cupy.cuda.compiler import DiskCacheBackend
+    except ImportError as e:
+        print(f"CuPy is not installed: {e}")
+        return
+    
+    # Create a custom cache backend
+    cache_dir = tempfile.mkdtemp(prefix='cupy_real_kernel_cache_')
+    backend = DiskCacheBackend(cache_dir=cache_dir)
+    
+    print(f"Using cache directory: {cache_dir}")
+    
+    # Simple kernel source
+    kernel_source = r'''
+    extern "C" __global__
+    void my_kernel(float* out, const float* in, int n) {
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        if (tid < n) {
+            out[tid] = in[tid] * 2.0f;
+        }
+    }
+    '''
+    
+    print("Compiling kernel with custom cache backend...")
+    print("Note: Passing cache_backend parameter is experimental.")
+    
+    try:
+        # Compile with the custom backend
+        # Note: This uses the internal API which may change
+        module = compiler._compile_module_with_cache(
+            kernel_source,
+            options=(),
+            cache_backend=backend
+        )
+        
+        print("Kernel compiled successfully!")
+        print(f"Cache directory now contains: {os.listdir(cache_dir)}")
+        
+        # Try to compile again - should use cache
+        print("\nCompiling the same kernel again (should use cache)...")
+        module2 = compiler._compile_module_with_cache(
+            kernel_source,
+            options=(),
+            cache_backend=backend
+        )
+        print("Second compilation completed (used cached version).")
+        
+    except Exception as e:
+        print(f"Error during compilation: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def main():
+    """Run all examples."""
+    print("=" * 70)
+    print("CuPy Kernel Cache Backend Examples")
+    print("=" * 70)
+    print("\nThese examples demonstrate the experimental cache backend API.")
+    print("The API may change in future releases.")
+    
+    # Run examples
+    example_disk_backend()
+    example_gcp_backend()
+    example_custom_backend()
+    
+    # Check if CUDA is available before running real kernel example
+    try:
+        import cupy
+        if cupy.cuda.runtime.getDeviceCount() > 0:
+            example_with_real_kernel()
+        else:
+            print("\n=== Example 4: Skipped (No CUDA device available) ===")
+    except Exception:
+        print("\n=== Example 4: Skipped (CuPy not available or no CUDA) ===")
+    
+    print("\n" + "=" * 70)
+    print("Examples completed!")
+    print("=" * 70)
+
+
+if __name__ == '__main__':
+    main()

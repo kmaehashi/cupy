@@ -497,6 +497,140 @@ def _preprocess(source, options, arch, backend):
 _default_cache_dir = os.path.expanduser('~/.cupy/kernel_cache')
 
 
+class CacheBackend:
+    """Abstract base class for cache storage backends.
+
+    This class defines the interface for pluggable cache storage backends.
+    Subclasses should implement methods to load, save, and check the existence
+    of compiled kernel binaries.
+    """
+
+    def load(self, name):
+        """Load a cached kernel binary.
+
+        Args:
+            name (str): The cache key (filename) for the compiled kernel.
+
+        Returns:
+            bytes or None: The cached binary data if found and valid,
+                None otherwise.
+        """
+        raise NotImplementedError
+
+    def save(self, name, data):
+        """Save a compiled kernel binary to cache.
+
+        Args:
+            name (str): The cache key (filename) for the compiled kernel.
+            data (bytes): The binary data to cache (hash + cubin).
+        """
+        raise NotImplementedError
+
+    def exists(self, name):
+        """Check if a cached kernel binary exists.
+
+        Args:
+            name (str): The cache key (filename) for the compiled kernel.
+
+        Returns:
+            bool: True if the cache entry exists, False otherwise.
+        """
+        raise NotImplementedError
+
+
+class DiskCacheBackend(CacheBackend):
+    """Disk-based cache storage backend.
+
+    This backend stores compiled kernel binaries in a directory on disk.
+    """
+
+    def __init__(self, cache_dir=None):
+        """Initialize the disk cache backend.
+
+        Args:
+            cache_dir (str, optional): Directory to store cache files.
+                Defaults to CUPY_CACHE_DIR environment variable or
+                ~/.cupy/kernel_cache.
+        """
+        if cache_dir is None:
+            cache_dir = os.environ.get('CUPY_CACHE_DIR', _default_cache_dir)
+        self._cache_dir = cache_dir
+        if not os.path.isdir(self._cache_dir):
+            os.makedirs(self._cache_dir, exist_ok=True)
+
+    def load(self, name):
+        """Load a cached kernel binary from disk.
+
+        Args:
+            name (str): The cache key (filename) for the compiled kernel.
+
+        Returns:
+            bytes or None: The cached binary data if found and valid,
+                None otherwise.
+        """
+        path = os.path.join(self._cache_dir, name)
+        if not os.path.exists(path):
+            return None
+
+        with open(path, 'rb') as file:
+            data = file.read()
+
+        if len(data) < _hash_length:
+            return None
+
+        hash_stored = data[:_hash_length]
+        cubin = data[_hash_length:]
+        cubin_hash = _hash_hexdigest(cubin).encode('ascii')
+
+        if hash_stored != cubin_hash:
+            # Hash mismatch, corrupted cache
+            return None
+
+        return data
+
+    def save(self, name, data):
+        """Save a compiled kernel binary to disk.
+
+        Args:
+            name (str): The cache key (filename) for the compiled kernel.
+            data (bytes): The binary data to cache (hash + cubin).
+        """
+        path = os.path.join(self._cache_dir, name)
+
+        # Write to a temporary file and atomically replace
+        with tempfile.NamedTemporaryFile(
+                dir=self._cache_dir, delete=False) as tf:
+            tf.write(data)
+            temp_path = tf.name
+
+        try:
+            os.replace(temp_path, path)
+        except PermissionError:
+            # Windows may refuse to replace the file, assume this is a race
+            # and the existing file is OK (but keep using our copy)
+            pass
+
+    def exists(self, name):
+        """Check if a cached kernel binary exists on disk.
+
+        Args:
+            name (str): The cache key (filename) for the compiled kernel.
+
+        Returns:
+            bool: True if the cache file exists, False otherwise.
+        """
+        path = os.path.join(self._cache_dir, name)
+        return os.path.exists(path)
+
+    def get_cache_dir(self):
+        """Get the cache directory path.
+
+        Returns:
+            str: The cache directory path.
+        """
+        return self._cache_dir
+
+
 def get_cache_dir():
     return os.environ.get('CUPY_CACHE_DIR', _default_cache_dir)
 
@@ -507,7 +641,8 @@ _empty_file_preprocess_cache: dict = {}
 def _compile_module_with_cache(
         source, options=(), arch=None, cache_dir=None, extra_source=None,
         backend='nvrtc', *, enable_cooperative_groups=False,
-        name_expressions=None, log_stream=None, jitify=False, to_ltoir=False):
+        name_expressions=None, log_stream=None, jitify=False, to_ltoir=False,
+        cache_backend=None):
 
     if enable_cooperative_groups:
         if runtime.is_hip:
@@ -532,15 +667,21 @@ def _compile_module_with_cache(
         return _compile_with_cache_cuda(
             source, options, arch, cache_dir, extra_source, backend,
             enable_cooperative_groups, name_expressions, log_stream,
-            cache_in_memory, jitify, to_ltoir)
+            cache_in_memory, jitify, to_ltoir, cache_backend)
 
 
 def _compile_with_cache_cuda(
         source, options, arch, cache_dir, extra_source=None, backend='nvrtc',
         enable_cooperative_groups=False, name_expressions=None,
-        log_stream=None, cache_in_memory=False, jitify=False, to_ltoir=False):
+        log_stream=None, cache_in_memory=False, jitify=False, to_ltoir=False,
+        cache_backend=None):
     # NVRTC does not use extra_source. extra_source is used for cache key.
     global _empty_file_preprocess_cache
+    
+    # Initialize cache backend if not provided
+    if cache_backend is None and not cache_in_memory:
+        cache_backend = DiskCacheBackend(cache_dir)
+    
     if cache_dir is None:
         cache_dir = get_cache_dir()
     if arch is None:
@@ -595,27 +736,18 @@ def _compile_with_cache_cuda(
         mod = function.Module()
 
     if not cache_in_memory:
-        # Read from disk cache
-        if not os.path.isdir(cache_dir):
-            os.makedirs(cache_dir, exist_ok=True)
-
-        # To handle conflicts in concurrent situation, we adopt lock-free
-        # method to avoid performance degradation.
+        # Read from cache using backend
         # We force recompiling to retrieve C++ mangled names if so desired.
-        path = os.path.join(cache_dir, name)
-        if os.path.exists(path) and not name_expressions:
-            with open(path, 'rb') as file:
-                data = file.read()
-            if len(data) >= _hash_length:
-                hash = data[:_hash_length]
+        if cache_backend.exists(name) and not name_expressions:
+            data = cache_backend.load(name)
+            if data is not None:
+                hash_stored = data[:_hash_length]
                 cubin = data[_hash_length:]
-                cubin_hash = _hash_hexdigest(cubin).encode('ascii')
-                if hash == cubin_hash:
-                    if to_ltoir:
-                        return cubin
-                    else:
-                        mod.load(cubin)
-                        return mod
+                if to_ltoir:
+                    return cubin
+                else:
+                    mod.load(cubin)
+                    return mod
     else:
         # Enforce compiling -- the resulting kernel will be cached elsewhere,
         # so we do nothing
@@ -650,27 +782,19 @@ def _compile_with_cache_cuda(
         raise ValueError('Invalid backend %s' % backend)
 
     if not cache_in_memory:
-        # Write to disk cache
+        # Write to cache using backend
         cubin_hash = _hash_hexdigest(cubin).encode('ascii')
-
-        # Replacing the file should be atomic. But we add a hash for safety
-        # to detect possible corruption.
-        with tempfile.NamedTemporaryFile(dir=cache_dir, delete=False) as tf:
-            tf.write(cubin_hash)
-            tf.write(cubin)
-            temp_path = tf.name
-
-        try:
-            os.replace(temp_path, path)
-        except PermissionError:
-            # Windows may refuse to replace the file, assume this is a race
-            # and the existing file is OK (but keep using our copy)
-            pass
+        data = cubin_hash + cubin
+        cache_backend.save(name, data)
 
         # Save .cu source file along with .cubin
         if _get_bool_env_variable('CUPY_CACHE_SAVE_CUDA_SOURCE', False):
-            with open(path + '.cu', 'w') as f:
-                f.write(source)
+            # For disk cache backend, save the source file
+            if hasattr(cache_backend, 'get_cache_dir'):
+                cache_dir_path = cache_backend.get_cache_dir()
+                path = os.path.join(cache_dir_path, name)
+                with open(path + '.cu', 'w') as f:
+                    f.write(source)
     else:
         # we don't do any disk I/O
         pass
