@@ -13,16 +13,13 @@ import tempfile
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 
-class MockCacheBackend:
-    """Mock CacheBackend for testing without CuPy."""
+class MockKernelCacheBackend:
+    """Mock KernelCacheBackend for testing without CuPy."""
     
     def load(self, name):
         raise NotImplementedError
     
     def save(self, name, data):
-        raise NotImplementedError
-    
-    def exists(self, name):
         raise NotImplementedError
 
 
@@ -60,13 +57,6 @@ def test_gcp_backend_without_credentials():
             backend.save(test_name, test_data)
             print("  ✓ Save operation completed")
             
-            # Check existence
-            if backend.exists(test_name):
-                print("  ✓ Exists check passed")
-            else:
-                print("  ✗ Exists check failed")
-                return False
-            
             # Load
             loaded = backend.load(test_name)
             if loaded == test_data:
@@ -91,15 +81,12 @@ def test_mock_backend_interface():
     print("Testing backend interface...")
     
     # Create a concrete implementation for testing
-    class TestBackend(MockCacheBackend):
+    class TestBackend(MockKernelCacheBackend):
         def load(self, name):
             return None
         
         def save(self, name, data):
             pass
-        
-        def exists(self, name):
-            return False
     
     backend = TestBackend()
     
@@ -116,12 +103,6 @@ def test_mock_backend_interface():
         print("  ✓ save() completes without error")
     except Exception as e:
         print(f"  ✗ save() raised exception: {e}")
-        return False
-    
-    if not backend.exists('test'):
-        print("  ✓ exists() returns False")
-    else:
-        print("  ✗ exists() should return False")
         return False
     
     return True

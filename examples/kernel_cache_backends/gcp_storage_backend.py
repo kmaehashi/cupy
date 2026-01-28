@@ -40,98 +40,14 @@ Features:
 import os
 import warnings
 
-try:
-    from google.cloud import storage
-    from google.api_core import exceptions as gcp_exceptions
-    _GCP_AVAILABLE = True
-except ImportError:
-    _GCP_AVAILABLE = False
-    warnings.warn(
-        "google-cloud-storage is not installed. "
-        "GCPStorageCacheBackend will only use local disk cache. "
-        "Install with: pip install google-cloud-storage",
-        RuntimeWarning
-    )
+from google.cloud import storage
+from google.api_core import exceptions as gcp_exceptions
 
 # Import the base class from cupy
-# Note: This assumes the CacheBackend abstraction has been added to compiler.py
-try:
-    from cupy.cuda.compiler import CacheBackend, DiskCacheBackend
-except ImportError:
-    # Fallback for development/testing
-    import tempfile
-    import hashlib
-    
-    def _hash_hexdigest(value):
-        """Simple hash function for fallback."""
-        return hashlib.sha1(value).hexdigest()
-    
-    _hash_length = len(_hash_hexdigest(b''))  # 40 for SHA1
-    
-    class CacheBackend:
-        """Fallback base class for development."""
-        def load(self, name):
-            raise NotImplementedError
-
-        def save(self, name, data):
-            raise NotImplementedError
-
-        def exists(self, name):
-            raise NotImplementedError
-
-    class DiskCacheBackend(CacheBackend):
-        """Fallback disk cache for development."""
-        def __init__(self, cache_dir=None):
-            if cache_dir is None:
-                cache_dir = os.path.expanduser('~/.cupy/kernel_cache')
-            self._cache_dir = cache_dir
-            os.makedirs(cache_dir, exist_ok=True)
-        
-        def load(self, name):
-            """Load a cached kernel binary from disk."""
-            path = os.path.join(self._cache_dir, name)
-            if not os.path.exists(path):
-                return None
-
-            with open(path, 'rb') as file:
-                data = file.read()
-
-            if len(data) < _hash_length:
-                return None
-
-            hash_stored = data[:_hash_length]
-            cubin = data[_hash_length:]
-            cubin_hash = _hash_hexdigest(cubin).encode('ascii')
-
-            if hash_stored != cubin_hash:
-                return None
-
-            return data
-        
-        def save(self, name, data):
-            """Save a compiled kernel binary to disk."""
-            path = os.path.join(self._cache_dir, name)
-            with tempfile.NamedTemporaryFile(
-                    dir=self._cache_dir, delete=False) as tf:
-                tf.write(data)
-                temp_path = tf.name
-
-            try:
-                os.replace(temp_path, path)
-            except PermissionError:
-                pass
-        
-        def exists(self, name):
-            """Check if a cached kernel binary exists on disk."""
-            path = os.path.join(self._cache_dir, name)
-            return os.path.exists(path)
-        
-        def get_cache_dir(self):
-            """Get the cache directory path."""
-            return self._cache_dir
+from cupy.cuda.compiler import KernelCacheBackend, DiskKernelCacheBackend
 
 
-class GCPStorageCacheBackend(DiskCacheBackend):
+class GCPStorageCacheBackend(DiskKernelCacheBackend):
     """
     **EXPERIMENTAL** GCP Cloud Storage backed cache backend.
 
@@ -165,16 +81,6 @@ class GCPStorageCacheBackend(DiskCacheBackend):
         """Initialize the GCP Storage cache backend."""
         # Initialize the parent disk cache
         super().__init__(local_cache_dir)
-
-        if not _GCP_AVAILABLE:
-            warnings.warn(
-                "GCP Storage backend will only use local disk cache. "
-                "Install google-cloud-storage to enable GCS functionality.",
-                RuntimeWarning
-            )
-            self._gcp_enabled = False
-            self._bucket = None
-            return
 
         self.bucket_name = bucket_name
         self.prefix = prefix
@@ -290,32 +196,3 @@ class GCPStorageCacheBackend(DiskCacheBackend):
                     f"Unexpected error uploading to GCS: {e}",
                     RuntimeWarning
                 )
-
-    def exists(self, name):
-        """
-        Check if a cached kernel binary exists.
-
-        Checks local disk first, then GCS if not found locally.
-
-        Args:
-            name (str): The cache key (filename) for the compiled kernel.
-
-        Returns:
-            bool: True if the cache entry exists (locally or in GCS),
-                False otherwise.
-        """
-        # Check local disk first
-        if super().exists(name):
-            return True
-
-        # If not local and GCP is enabled, check GCS
-        if self._gcp_enabled and self._bucket is not None:
-            try:
-                gcs_key = self._get_gcs_key(name)
-                blob = self._bucket.blob(gcs_key)
-                return blob.exists()
-            except Exception:
-                # If we can't check GCS, assume it doesn't exist
-                return False
-
-        return False

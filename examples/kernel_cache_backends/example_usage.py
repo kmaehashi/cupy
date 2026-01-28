@@ -18,17 +18,12 @@ def example_disk_backend():
     """Example using the built-in disk cache backend."""
     print("\n=== Example 1: Disk Cache Backend ===")
     
-    try:
-        from cupy.cuda.compiler import DiskCacheBackend
-    except ImportError:
-        print("CuPy is not installed or cache backend is not available.")
-        return
-    
+    from cupy.cuda.compiler import DiskKernelCacheBackend
     import hashlib
     
     # Create a disk cache backend with a custom directory
     cache_dir = tempfile.mkdtemp(prefix='cupy_cache_example_')
-    backend = DiskCacheBackend(cache_dir=cache_dir)
+    backend = DiskKernelCacheBackend(cache_dir=cache_dir)
     
     print(f"Cache directory: {cache_dir}")
     
@@ -105,15 +100,10 @@ def example_custom_backend():
     """Example implementing a simple in-memory cache backend."""
     print("\n=== Example 3: Custom In-Memory Cache Backend ===")
     
-    try:
-        from cupy.cuda.compiler import CacheBackend
-    except ImportError:
-        print("CuPy is not installed or cache backend is not available.")
-        return
-    
+    from cupy.cuda.compiler import KernelCacheBackend
     import hashlib
     
-    class InMemoryCacheBackend(CacheBackend):
+    class InMemoryCacheBackend(KernelCacheBackend):
         """Simple in-memory cache backend for demonstration."""
         
         def __init__(self):
@@ -124,9 +114,6 @@ def example_custom_backend():
         
         def save(self, name, data):
             self._cache[name] = data
-        
-        def exists(self, name):
-            return name in self._cache
     
     # Create and use the in-memory backend
     backend = InMemoryCacheBackend()
@@ -140,10 +127,7 @@ def example_custom_backend():
     print("Saving test data to in-memory cache...")
     backend.save(test_name, test_data)
     
-    print(f"Checking if '{test_name}' exists: {backend.exists(test_name)}")
-    
-    loaded_data = backend.load(test_name)
-    print(f"Loaded data matches saved data: {loaded_data == test_data}")
+    print(f"Loaded data matches saved data: {backend.load(test_name) == test_data}")
 
 
 def example_with_real_kernel():
@@ -153,16 +137,19 @@ def example_with_real_kernel():
     try:
         import cupy
         from cupy.cuda import compiler
-        from cupy.cuda.compiler import DiskCacheBackend
+        from cupy.cuda.compiler import DiskKernelCacheBackend, _set_kernel_cache_backend
     except ImportError as e:
         print(f"CuPy is not installed: {e}")
         return
     
     # Create a custom cache backend
     cache_dir = tempfile.mkdtemp(prefix='cupy_real_kernel_cache_')
-    backend = DiskCacheBackend(cache_dir=cache_dir)
+    backend = DiskKernelCacheBackend(cache_dir=cache_dir)
     
     print(f"Using cache directory: {cache_dir}")
+    
+    # Set the global cache backend
+    _set_kernel_cache_backend(backend)
     
     # Simple kernel source
     kernel_source = r'''
@@ -176,17 +163,13 @@ def example_with_real_kernel():
     '''
     
     print("Compiling kernel with custom cache backend...")
-    print("Note: Passing cache_backend parameter is experimental.")
-    print("This example uses the internal API (_compile_module_with_cache)")
-    print("which may change. In production, use higher-level APIs.")
+    print("Note: Using _set_kernel_cache_backend to change the global backend.")
     
     try:
-        # Compile with the custom backend
-        # Note: This uses the internal API which may change
+        # Compile with the custom backend (now uses global backend)
         module = compiler._compile_module_with_cache(
             kernel_source,
-            options=(),
-            cache_backend=backend
+            options=()
         )
         
         print("Kernel compiled successfully!")
@@ -196,8 +179,7 @@ def example_with_real_kernel():
         print("\nCompiling the same kernel again (should use cache)...")
         module2 = compiler._compile_module_with_cache(
             kernel_source,
-            options=(),
-            cache_backend=backend
+            options=()
         )
         print("Second compilation completed (used cached version).")
         

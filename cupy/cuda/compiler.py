@@ -498,16 +498,16 @@ def _preprocess(source, options, arch, backend):
 _default_cache_dir = os.path.expanduser('~/.cupy/kernel_cache')
 
 
-class CacheBackend(abc.ABC):
-    """Abstract base class for cache storage backends.
+class KernelCacheBackend(abc.ABC):
+    """Abstract base class for kernel cache storage backends.
 
     This class defines the interface for pluggable cache storage backends.
-    Subclasses should implement methods to load, save, and check the existence
-    of compiled kernel binaries.
+    Subclasses should implement methods to load and save compiled kernel
+    binaries.
     """
 
     @abc.abstractmethod
-    def load(self, name):
+    def load(self, name: str) -> bytes | None:
         """Load a cached kernel binary.
 
         Args:
@@ -520,8 +520,11 @@ class CacheBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def save(self, name, data):
+    def save(self, name: str, data: bytes) -> None:
         """Save a compiled kernel binary to cache.
+
+        This method may perform I/O asynchronously to avoid blocking
+        kernel execution.
 
         Args:
             name (str): The cache key (filename) for the compiled kernel.
@@ -529,26 +532,14 @@ class CacheBackend(abc.ABC):
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def exists(self, name):
-        """Check if a cached kernel binary exists.
 
-        Args:
-            name (str): The cache key (filename) for the compiled kernel.
-
-        Returns:
-            bool: True if the cache entry exists, False otherwise.
-        """
-        raise NotImplementedError
-
-
-class DiskCacheBackend(CacheBackend):
-    """Disk-based cache storage backend.
+class DiskKernelCacheBackend(KernelCacheBackend):
+    """Disk-based kernel cache storage backend.
 
     This backend stores compiled kernel binaries in a directory on disk.
     """
 
-    def __init__(self, cache_dir=None):
+    def __init__(self, cache_dir: str | None = None):
         """Initialize the disk cache backend.
 
         Args:
@@ -562,7 +553,7 @@ class DiskCacheBackend(CacheBackend):
         if not os.path.isdir(self._cache_dir):
             os.makedirs(self._cache_dir, exist_ok=True)
 
-    def load(self, name):
+    def load(self, name: str) -> bytes | None:
         """Load a cached kernel binary from disk.
 
         Args:
@@ -592,7 +583,7 @@ class DiskCacheBackend(CacheBackend):
 
         return data
 
-    def save(self, name, data):
+    def save(self, name: str, data: bytes) -> None:
         """Save a compiled kernel binary to disk.
 
         Args:
@@ -614,25 +605,40 @@ class DiskCacheBackend(CacheBackend):
             # and the existing file is OK (but keep using our copy)
             pass
 
-    def exists(self, name):
-        """Check if a cached kernel binary exists on disk.
+    def save_source(self, name: str, source: str) -> None:
+        """Save the .cu source file along with the compiled binary.
 
         Args:
             name (str): The cache key (filename) for the compiled kernel.
-
-        Returns:
-            bool: True if the cache file exists, False otherwise.
+            source (str): The CUDA source code.
         """
         path = os.path.join(self._cache_dir, name)
-        return os.path.exists(path)
+        with open(path + '.cu', 'w') as f:
+            f.write(source)
 
-    def get_cache_dir(self):
+    def get_cache_dir(self) -> str:
         """Get the cache directory path.
 
         Returns:
             str: The cache directory path.
         """
         return self._cache_dir
+
+
+# Global kernel cache backend instance
+_kernel_cache_backend: KernelCacheBackend = DiskKernelCacheBackend()
+
+
+def _set_kernel_cache_backend(backend: KernelCacheBackend) -> None:
+    """Set the global kernel cache backend.
+    
+    This is a private API to allow programmatically changing the cache backend.
+    
+    Args:
+        backend: The kernel cache backend instance to use.
+    """
+    global _kernel_cache_backend
+    _kernel_cache_backend = backend
 
 
 def get_cache_dir():
@@ -645,8 +651,7 @@ _empty_file_preprocess_cache: dict = {}
 def _compile_module_with_cache(
         source, options=(), arch=None, cache_dir=None, extra_source=None,
         backend='nvrtc', *, enable_cooperative_groups=False,
-        name_expressions=None, log_stream=None, jitify=False, to_ltoir=False,
-        cache_backend=None):
+        name_expressions=None, log_stream=None, jitify=False, to_ltoir=False):
 
     if enable_cooperative_groups:
         if runtime.is_hip:
@@ -663,8 +668,6 @@ def _compile_module_with_cache(
         and backend == 'nvrtc')
 
     if runtime.is_hip:
-        # Note: HIP backend does not currently support custom cache_backend
-        # parameter. It uses the default disk cache only.
         backend = 'hiprtc' if backend == 'nvrtc' else 'hipcc'
         return _compile_with_cache_hip(
             source, options, arch, cache_dir, extra_source, backend,
@@ -673,20 +676,15 @@ def _compile_module_with_cache(
         return _compile_with_cache_cuda(
             source, options, arch, cache_dir, extra_source, backend,
             enable_cooperative_groups, name_expressions, log_stream,
-            cache_in_memory, jitify, to_ltoir, cache_backend)
+            cache_in_memory, jitify, to_ltoir)
 
 
 def _compile_with_cache_cuda(
         source, options, arch, cache_dir, extra_source=None, backend='nvrtc',
         enable_cooperative_groups=False, name_expressions=None,
-        log_stream=None, cache_in_memory=False, jitify=False, to_ltoir=False,
-        cache_backend=None):
+        log_stream=None, cache_in_memory=False, jitify=False, to_ltoir=False):
     # NVRTC does not use extra_source. extra_source is used for cache key.
     global _empty_file_preprocess_cache
-    
-    # Initialize cache backend if not provided
-    if cache_backend is None and not cache_in_memory:
-        cache_backend = DiskCacheBackend(cache_dir)
     
     if cache_dir is None:
         cache_dir = get_cache_dir()
@@ -742,10 +740,10 @@ def _compile_with_cache_cuda(
         mod = function.Module()
 
     if not cache_in_memory:
-        # Read from cache using backend
+        # Read from cache using global backend
         # We force recompiling to retrieve C++ mangled names if so desired.
-        if cache_backend.exists(name) and not name_expressions:
-            data = cache_backend.load(name)
+        if not name_expressions:
+            data = _kernel_cache_backend.load(name)
             if data is not None:
                 hash_stored = data[:_hash_length]
                 cubin = data[_hash_length:]
@@ -788,19 +786,16 @@ def _compile_with_cache_cuda(
         raise ValueError('Invalid backend %s' % backend)
 
     if not cache_in_memory:
-        # Write to cache using backend
+        # Write to cache using global backend
         cubin_hash = _hash_hexdigest(cubin).encode('ascii')
         data = cubin_hash + cubin
-        cache_backend.save(name, data)
+        _kernel_cache_backend.save(name, data)
 
         # Save .cu source file along with .cubin
         if _get_bool_env_variable('CUPY_CACHE_SAVE_CUDA_SOURCE', False):
-            # For disk cache backend, save the source file
-            if hasattr(cache_backend, 'get_cache_dir'):
-                cache_dir_path = cache_backend.get_cache_dir()
-                path = os.path.join(cache_dir_path, name)
-                with open(path + '.cu', 'w') as f:
-                    f.write(source)
+            # Use DiskKernelCacheBackend method if available
+            if isinstance(_kernel_cache_backend, DiskKernelCacheBackend):
+                _kernel_cache_backend.save_source(name, source)
     else:
         # we don't do any disk I/O
         pass
