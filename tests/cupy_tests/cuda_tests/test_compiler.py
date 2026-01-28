@@ -138,3 +138,127 @@ class TestExceptionPicklable(unittest.TestCase):
 class TestCompileWithCache:
     def test_compile_module_with_cache(self):
         compiler._compile_module_with_cache('__device__ void func() {}')
+
+
+class TestCacheBackend(unittest.TestCase):
+    """Tests for cache backend abstraction."""
+
+    def test_disk_cache_backend_save_and_load(self):
+        """Test basic save and load operations."""
+        import tempfile
+        import os
+        import hashlib
+        
+        # Create a temporary directory for testing
+        with tempfile.TemporaryDirectory() as tmpdir:
+            backend = compiler.DiskCacheBackend(cache_dir=tmpdir)
+            
+            # Test data with proper hash
+            name = 'test_kernel.cubin'
+            cubin_data = b'kernel_binary_data'
+            cubin_hash = hashlib.sha1(cubin_data).hexdigest().encode('ascii')
+            test_data = cubin_hash + cubin_data
+            
+            # Save data
+            backend.save(name, test_data)
+            
+            # Check existence
+            self.assertTrue(backend.exists(name))
+            
+            # Load data
+            loaded_data = backend.load(name)
+            self.assertEqual(loaded_data, test_data)
+            
+            # Verify file was created
+            cache_path = os.path.join(tmpdir, name)
+            self.assertTrue(os.path.exists(cache_path))
+
+    def test_disk_cache_backend_load_nonexistent(self):
+        """Test loading a non-existent cache entry."""
+        import tempfile
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            backend = compiler.DiskCacheBackend(cache_dir=tmpdir)
+            
+            # Try to load non-existent file
+            result = backend.load('nonexistent.cubin')
+            self.assertIsNone(result)
+            
+            # Check existence
+            self.assertFalse(backend.exists('nonexistent.cubin'))
+
+    def test_disk_cache_backend_hash_validation(self):
+        """Test that corrupted cache data is rejected."""
+        import tempfile
+        import os
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            backend = compiler.DiskCacheBackend(cache_dir=tmpdir)
+            
+            name = 'test_kernel.cubin'
+            # Create corrupted data (wrong hash)
+            corrupted_data = b'wrong_hash_1234567890123456789012345678' + b'kernel_data'
+            
+            # Write corrupted data directly to file
+            cache_path = os.path.join(tmpdir, name)
+            with open(cache_path, 'wb') as f:
+                f.write(corrupted_data)
+            
+            # File exists but should fail validation
+            self.assertTrue(backend.exists(name))
+            
+            # Load should return None due to hash mismatch
+            result = backend.load(name)
+            self.assertIsNone(result)
+
+    def test_disk_cache_backend_default_directory(self):
+        """Test that default cache directory is used when none specified."""
+        backend = compiler.DiskCacheBackend()
+        
+        # Should use the default cache directory
+        expected_default = os.environ.get('CUPY_CACHE_DIR', 
+                                         os.path.expanduser('~/.cupy/kernel_cache'))
+        self.assertEqual(backend.get_cache_dir(), expected_default)
+
+    def test_compile_with_custom_backend(self):
+        """Test compilation with a custom cache backend."""
+        import tempfile
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            backend = compiler.DiskCacheBackend(cache_dir=tmpdir)
+            
+            # Simple kernel source
+            source = '__device__ void test_func() {}'
+            
+            # First compilation - should create cache entry
+            result1 = compiler._compile_module_with_cache(
+                source,
+                cache_backend=backend
+            )
+            self.assertIsNotNone(result1)
+            
+            # Check that something was cached
+            cache_files = os.listdir(tmpdir)
+            self.assertGreater(len(cache_files), 0)
+            
+            # Second compilation - should use cache
+            result2 = compiler._compile_module_with_cache(
+                source,
+                cache_backend=backend
+            )
+            self.assertIsNotNone(result2)
+
+    def test_cache_backend_interface(self):
+        """Test that CacheBackend is an abstract interface."""
+        # CacheBackend should not be instantiable directly
+        backend = compiler.CacheBackend()
+        
+        # Methods should raise NotImplementedError
+        with self.assertRaises(NotImplementedError):
+            backend.load('test')
+        
+        with self.assertRaises(NotImplementedError):
+            backend.save('test', b'data')
+        
+        with self.assertRaises(NotImplementedError):
+            backend.exists('test')

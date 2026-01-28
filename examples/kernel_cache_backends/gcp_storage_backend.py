@@ -59,6 +59,15 @@ try:
     from cupy.cuda.compiler import CacheBackend, DiskCacheBackend
 except ImportError:
     # Fallback for development/testing
+    import tempfile
+    import hashlib
+    
+    def _hash_hexdigest(value):
+        """Simple hash function for fallback."""
+        return hashlib.sha1(value).hexdigest()
+    
+    _hash_length = len(_hash_hexdigest(b''))  # 40 for SHA1
+    
     class CacheBackend:
         """Fallback base class for development."""
         def load(self, name):
@@ -75,6 +84,49 @@ except ImportError:
         def __init__(self, cache_dir):
             self._cache_dir = cache_dir
             os.makedirs(cache_dir, exist_ok=True)
+        
+        def load(self, name):
+            """Load a cached kernel binary from disk."""
+            path = os.path.join(self._cache_dir, name)
+            if not os.path.exists(path):
+                return None
+
+            with open(path, 'rb') as file:
+                data = file.read()
+
+            if len(data) < _hash_length:
+                return None
+
+            hash_stored = data[:_hash_length]
+            cubin = data[_hash_length:]
+            cubin_hash = _hash_hexdigest(cubin).encode('ascii')
+
+            if hash_stored != cubin_hash:
+                return None
+
+            return data
+        
+        def save(self, name, data):
+            """Save a compiled kernel binary to disk."""
+            path = os.path.join(self._cache_dir, name)
+            with tempfile.NamedTemporaryFile(
+                    dir=self._cache_dir, delete=False) as tf:
+                tf.write(data)
+                temp_path = tf.name
+
+            try:
+                os.replace(temp_path, path)
+            except PermissionError:
+                pass
+        
+        def exists(self, name):
+            """Check if a cached kernel binary exists on disk."""
+            path = os.path.join(self._cache_dir, name)
+            return os.path.exists(path)
+        
+        def get_cache_dir(self):
+            """Get the cache directory path."""
+            return self._cache_dir
 
 
 class GCPStorageCacheBackend(DiskCacheBackend):
