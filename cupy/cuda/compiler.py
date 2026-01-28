@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import copy
 import hashlib
 import math
@@ -497,7 +498,7 @@ def _preprocess(source, options, arch, backend):
 _default_cache_dir = os.path.expanduser('~/.cupy/kernel_cache')
 
 
-class CacheBackend:
+class CacheBackend(abc.ABC):
     """Abstract base class for cache storage backends.
 
     This class defines the interface for pluggable cache storage backends.
@@ -505,6 +506,7 @@ class CacheBackend:
     of compiled kernel binaries.
     """
 
+    @abc.abstractmethod
     def load(self, name):
         """Load a cached kernel binary.
 
@@ -517,6 +519,7 @@ class CacheBackend:
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
     def save(self, name, data):
         """Save a compiled kernel binary to cache.
 
@@ -526,6 +529,7 @@ class CacheBackend:
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
     def exists(self, name):
         """Check if a cached kernel binary exists.
 
@@ -659,6 +663,8 @@ def _compile_module_with_cache(
         and backend == 'nvrtc')
 
     if runtime.is_hip:
+        # Note: HIP backend does not currently support custom cache_backend
+        # parameter. It uses the default disk cache only.
         backend = 'hiprtc' if backend == 'nvrtc' else 'hipcc'
         return _compile_with_cache_hip(
             source, options, arch, cache_dir, extra_source, backend,

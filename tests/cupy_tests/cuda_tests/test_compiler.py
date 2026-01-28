@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import pickle
 import unittest
 from unittest import mock
@@ -250,15 +251,23 @@ class TestCacheBackend(unittest.TestCase):
 
     def test_cache_backend_interface(self):
         """Test that CacheBackend is an abstract interface."""
-        # CacheBackend should not be instantiable directly
-        backend = compiler.CacheBackend()
+        # CacheBackend is an ABC and should not be instantiable directly
+        with self.assertRaises(TypeError):
+            compiler.CacheBackend()
         
-        # Methods should raise NotImplementedError
-        with self.assertRaises(NotImplementedError):
-            backend.load('test')
+        # Create a concrete implementation for testing
+        class TestBackend(compiler.CacheBackend):
+            def load(self, name):
+                return None
+            
+            def save(self, name, data):
+                pass
+            
+            def exists(self, name):
+                return False
         
-        with self.assertRaises(NotImplementedError):
-            backend.save('test', b'data')
-        
-        with self.assertRaises(NotImplementedError):
-            backend.exists('test')
+        # Concrete implementation should be instantiable
+        backend = TestBackend()
+        self.assertIsNone(backend.load('test'))
+        self.assertFalse(backend.exists('test'))
+        backend.save('test', b'data')  # Should not raise

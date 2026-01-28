@@ -24,6 +24,8 @@ def example_disk_backend():
         print("CuPy is not installed or cache backend is not available.")
         return
     
+    import hashlib
+    
     # Create a disk cache backend with a custom directory
     cache_dir = tempfile.mkdtemp(prefix='cupy_cache_example_')
     backend = DiskCacheBackend(cache_dir=cache_dir)
@@ -32,7 +34,10 @@ def example_disk_backend():
     
     # Demonstrate the backend interface
     test_name = "test_kernel.cubin"
-    test_data = b"hash1234" + b"compiled_kernel_binary_data"
+    cubin_data = b"compiled_kernel_binary_data"
+    # Create proper hash (SHA1 of the cubin data, hex-encoded)
+    cubin_hash = hashlib.sha1(cubin_data).hexdigest().encode('ascii')
+    test_data = cubin_hash + cubin_data
     
     # Save data
     print(f"Saving test data to cache...")
@@ -60,6 +65,8 @@ def example_gcp_backend():
         print(f"Failed to import GCP backend: {e}")
         return
     
+    import hashlib
+    
     # Create a GCP cache backend
     # Note: This requires a valid GCP bucket and credentials
     bucket_name = os.environ.get('CUPY_GCP_BUCKET', 'cupy-kernel-cache-example')
@@ -76,7 +83,10 @@ def example_gcp_backend():
         
         # The backend automatically falls back to local cache if GCP is unavailable
         test_name = "example_kernel.cubin"
-        test_data = b"hash5678" + b"another_compiled_kernel"
+        cubin_data = b"another_compiled_kernel"
+        # Create proper hash (SHA1 of the cubin data, hex-encoded)
+        cubin_hash = hashlib.sha1(cubin_data).hexdigest().encode('ascii')
+        test_data = cubin_hash + cubin_data
         
         print(f"Saving test data...")
         backend.save(test_name, test_data)
@@ -101,6 +111,8 @@ def example_custom_backend():
         print("CuPy is not installed or cache backend is not available.")
         return
     
+    import hashlib
+    
     class InMemoryCacheBackend(CacheBackend):
         """Simple in-memory cache backend for demonstration."""
         
@@ -120,7 +132,10 @@ def example_custom_backend():
     backend = InMemoryCacheBackend()
     
     test_name = "memory_kernel.cubin"
-    test_data = b"hash9999" + b"in_memory_kernel"
+    cubin_data = b"in_memory_kernel"
+    # Create proper hash (SHA1 of the cubin data, hex-encoded)
+    cubin_hash = hashlib.sha1(cubin_data).hexdigest().encode('ascii')
+    test_data = cubin_hash + cubin_data
     
     print("Saving test data to in-memory cache...")
     backend.save(test_name, test_data)
@@ -162,6 +177,8 @@ def example_with_real_kernel():
     
     print("Compiling kernel with custom cache backend...")
     print("Note: Passing cache_backend parameter is experimental.")
+    print("This example uses the internal API (_compile_module_with_cache)")
+    print("which may change. In production, use higher-level APIs.")
     
     try:
         # Compile with the custom backend

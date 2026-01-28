@@ -81,7 +81,9 @@ except ImportError:
 
     class DiskCacheBackend(CacheBackend):
         """Fallback disk cache for development."""
-        def __init__(self, cache_dir):
+        def __init__(self, cache_dir=None):
+            if cache_dir is None:
+                cache_dir = os.path.expanduser('~/.cupy/kernel_cache')
             self._cache_dir = cache_dir
             os.makedirs(cache_dir, exist_ok=True)
         
