@@ -16,18 +16,20 @@ Requirements:
 
 Usage:
     ```python
-    from cupy.cuda.compiler import CacheBackend
-    import cupy
+    from cupy.cuda.compiler import _set_kernel_cache_backend
+    from examples.kernel_cache_backends.gcp_storage_backend import (
+        GCPStorageCacheBackend
+    )
 
     # Create the GCP storage backend
     backend = GCPStorageCacheBackend(
         bucket_name='my-cupy-kernel-cache',
-        local_cache_dir='/tmp/cupy_cache'
+        local_cache_dir='/tmp/cupy_cache',
+        prefix='team/kernels/'
     )
-
-    # Use it for kernel compilation
-    # Note: You'll need to modify cupy internals to pass this backend
-    # This is just an example of how it could be used
+    
+    # Set it as the global cache backend
+    _set_kernel_cache_backend(backend)
     ```
 
 Features:
@@ -37,6 +39,8 @@ Features:
     - Falls back to local disk cache if GCP is unavailable
 """
 
+from __future__ import annotations
+
 import os
 import warnings
 
@@ -44,7 +48,7 @@ from google.cloud import storage
 from google.api_core import exceptions as gcp_exceptions
 
 # Import the base class from cupy
-from cupy.cuda.compiler import KernelCacheBackend, DiskKernelCacheBackend
+from cupy.cuda.compiler import DiskKernelCacheBackend
 
 
 class GCPStorageCacheBackend(DiskKernelCacheBackend):
@@ -57,12 +61,11 @@ class GCPStorageCacheBackend(DiskKernelCacheBackend):
 
     Args:
         bucket_name (str): Name of the GCS bucket to use for cache storage.
-        local_cache_dir (str, optional): Local directory to cache downloaded
-            files. Defaults to ~/.cupy/kernel_cache.
-        prefix (str, optional): Prefix to use for all cache keys in GCS.
-            Defaults to 'cupy_kernels/'.
-        project (str, optional): GCP project ID. If None, uses the default
-            project from credentials.
+        local_cache_dir (str | None, optional): Local directory to cache
+            downloaded files. Defaults to ~/.cupy/kernel_cache.
+        prefix (str): Prefix to use for all cache keys in GCS.
+        project (str | None, optional): GCP project ID. If None, uses the
+            default project from credentials.
 
     Attributes:
         bucket_name (str): The GCS bucket name.
@@ -76,8 +79,13 @@ class GCPStorageCacheBackend(DiskKernelCacheBackend):
         ... )
     """
 
-    def __init__(self, bucket_name, local_cache_dir=None, prefix='cupy_kernels/',
-                 project=None):
+    def __init__(
+        self,
+        bucket_name: str,
+        prefix: str,
+        local_cache_dir: str | None = None,
+        project: str | None = None,
+    ) -> None:
         """Initialize the GCP Storage cache backend."""
         # Initialize the parent disk cache
         super().__init__(local_cache_dir)
@@ -108,18 +116,7 @@ class GCPStorageCacheBackend(DiskKernelCacheBackend):
             self._gcp_enabled = False
             self._bucket = None
 
-    def _get_gcs_key(self, name):
-        """Get the full GCS key for a cache entry.
-
-        Args:
-            name (str): The cache entry name (filename).
-
-        Returns:
-            str: The full GCS key with prefix.
-        """
-        return self.prefix + name
-
-    def load(self, name):
+    def load(self, name: str) -> bytes | None:
         """
         Load a cached kernel binary.
 
@@ -130,42 +127,61 @@ class GCPStorageCacheBackend(DiskKernelCacheBackend):
             name (str): The cache key (filename) for the compiled kernel.
 
         Returns:
-            bytes or None: The cached binary data if found and valid,
-                None otherwise.
+            bytes or None: The cubin binary data (without hash prefix) if
+                found and valid, None otherwise.
         """
         # First, try to load from local disk cache
-        data = super().load(name)
-        if data is not None:
-            return data
+        cubin = super().load(name)
+        if cubin is not None:
+            return cubin
 
         # If not in local cache and GCP is enabled, try to download from GCS
-        if self._gcp_enabled and self._bucket is not None:
-            try:
-                gcs_key = self._get_gcs_key(name)
-                blob = self._bucket.blob(gcs_key)
+        if not self._gcp_enabled or self._bucket is None:
+            return None
 
-                if blob.exists():
-                    # Download from GCS
-                    data = blob.download_as_bytes()
+        try:
+            gcs_key = self.prefix + name
+            blob = self._bucket.blob(gcs_key)
 
-                    # Persist to local disk for future use
-                    super().save(name, data)
+            if blob.exists():
+                # Download from GCS (this includes hash + cubin)
+                data = blob.download_as_bytes()
 
-                    return data
-            except gcp_exceptions.GoogleAPIError as e:
-                warnings.warn(
-                    f"Failed to download from GCS: {e}. Using local cache only.",
-                    RuntimeWarning
-                )
-            except Exception as e:
-                warnings.warn(
-                    f"Unexpected error downloading from GCS: {e}",
-                    RuntimeWarning
-                )
+                # Parse and validate before persisting
+                # Note: super().save() will add hash, so we need to extract
+                # cubin from downloaded data first
+                from cupy.cuda._compiler_cache import _hash_length, _hash_hexdigest
+                
+                if len(data) < _hash_length:
+                    return None
+                
+                hash_stored = data[:_hash_length]
+                cubin = data[_hash_length:]
+                cubin_hash = _hash_hexdigest(cubin).encode('ascii')
+                
+                if hash_stored != cubin_hash:
+                    # Hash mismatch, corrupted cache
+                    return None
+
+                # Persist to local disk for future use
+                # We pass empty string for source as we don't have it
+                super().save(name, cubin, '')
+
+                return cubin
+        except gcp_exceptions.GoogleAPIError as e:
+            warnings.warn(
+                f"Failed to download from GCS: {e}. Using local cache only.",
+                RuntimeWarning
+            )
+        except Exception as e:
+            warnings.warn(
+                f"Unexpected error downloading from GCS: {e}",
+                RuntimeWarning
+            )
 
         return None
 
-    def save(self, name, data):
+    def save(self, name: str, cubin: bytes, source: str) -> None:
         """
         Save a compiled kernel binary to cache.
 
@@ -173,26 +189,34 @@ class GCPStorageCacheBackend(DiskKernelCacheBackend):
 
         Args:
             name (str): The cache key (filename) for the compiled kernel.
-            data (bytes): The binary data to cache (hash + cubin).
+            cubin (bytes): The compiled kernel binary data.
+            source (str): The CUDA source code.
         """
         # Always save to local disk first
-        super().save(name, data)
+        super().save(name, cubin, source)
 
-        # If GCP is enabled, also upload to GCS
-        if self._gcp_enabled and self._bucket is not None:
-            try:
-                gcs_key = self._get_gcs_key(name)
-                blob = self._bucket.blob(gcs_key)
+        # If GCP is not enabled, early return
+        if not self._gcp_enabled or self._bucket is None:
+            return
 
-                # Upload to GCS
-                blob.upload_from_string(data)
-            except gcp_exceptions.GoogleAPIError as e:
-                warnings.warn(
-                    f"Failed to upload to GCS: {e}. Kernel is cached locally only.",
-                    RuntimeWarning
-                )
-            except Exception as e:
-                warnings.warn(
-                    f"Unexpected error uploading to GCS: {e}",
-                    RuntimeWarning
-                )
+        try:
+            gcs_key = self.prefix + name
+            blob = self._bucket.blob(gcs_key)
+
+            # Need to upload with hash prefix for compatibility
+            from cupy.cuda._compiler_cache import _hash_hexdigest
+            cubin_hash = _hash_hexdigest(cubin).encode('ascii')
+            data = cubin_hash + cubin
+
+            # Upload to GCS
+            blob.upload_from_string(data)
+        except gcp_exceptions.GoogleAPIError as e:
+            warnings.warn(
+                f"Failed to upload to GCS: {e}. Kernel is cached locally only.",
+                RuntimeWarning
+            )
+        except Exception as e:
+            warnings.warn(
+                f"Unexpected error uploading to GCS: {e}",
+                RuntimeWarning
+            )

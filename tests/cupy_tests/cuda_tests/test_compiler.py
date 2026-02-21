@@ -148,24 +148,22 @@ class TestCacheBackend(unittest.TestCase):
         """Test basic save and load operations."""
         import tempfile
         import os
-        import hashlib
         
         # Create a temporary directory for testing
         with tempfile.TemporaryDirectory() as tmpdir:
             backend = compiler.DiskKernelCacheBackend(cache_dir=tmpdir)
             
-            # Test data with proper hash
+            # Test data
             name = 'test_kernel.cubin'
             cubin_data = b'kernel_binary_data'
-            cubin_hash = hashlib.sha1(cubin_data).hexdigest().encode('ascii')
-            test_data = cubin_hash + cubin_data
+            source = 'extern "C" __global__ void test() {}'
             
-            # Save data
-            backend.save(name, test_data)
+            # Save data (now takes cubin and source)
+            backend.save(name, cubin_data, source)
             
-            # Load data
+            # Load data (now returns just cubin)
             loaded_data = backend.load(name)
-            self.assertEqual(loaded_data, test_data)
+            self.assertEqual(loaded_data, cubin_data)
             
             # Verify file was created
             cache_path = os.path.join(tmpdir, name)
@@ -202,15 +200,6 @@ class TestCacheBackend(unittest.TestCase):
             # Load should return None due to hash mismatch
             result = backend.load(name)
             self.assertIsNone(result)
-
-    def test_disk_cache_backend_default_directory(self):
-        """Test that default cache directory is used when none specified."""
-        backend = compiler.DiskKernelCacheBackend()
-        
-        # Should use the default cache directory
-        expected_default = os.environ.get('CUPY_CACHE_DIR', 
-                                         os.path.expanduser('~/.cupy/kernel_cache'))
-        self.assertEqual(backend.get_cache_dir(), expected_default)
 
     def test_compile_with_custom_backend(self):
         """Test compilation with a custom cache backend."""

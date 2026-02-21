@@ -16,6 +16,12 @@ import warnings
 from cupy.cuda import device
 from cupy.cuda import function
 from cupy.cuda import get_rocm_path
+from cupy.cuda._compiler_cache import (
+    _kernel_cache_backend,
+    _set_kernel_cache_backend,
+    DiskKernelCacheBackend,
+    KernelCacheBackend,
+)
 from cupy_backends.cuda.api import driver
 from cupy_backends.cuda.api import runtime
 from cupy_backends.cuda.libs import nvrtc
@@ -498,149 +504,6 @@ def _preprocess(source, options, arch, backend):
 _default_cache_dir = os.path.expanduser('~/.cupy/kernel_cache')
 
 
-class KernelCacheBackend(abc.ABC):
-    """Abstract base class for kernel cache storage backends.
-
-    This class defines the interface for pluggable cache storage backends.
-    Subclasses should implement methods to load and save compiled kernel
-    binaries.
-    """
-
-    @abc.abstractmethod
-    def load(self, name: str) -> bytes | None:
-        """Load a cached kernel binary.
-
-        Args:
-            name (str): The cache key (filename) for the compiled kernel.
-
-        Returns:
-            bytes or None: The cached binary data if found and valid,
-                None otherwise.
-        """
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def save(self, name: str, data: bytes) -> None:
-        """Save a compiled kernel binary to cache.
-
-        This method may perform I/O asynchronously to avoid blocking
-        kernel execution.
-
-        Args:
-            name (str): The cache key (filename) for the compiled kernel.
-            data (bytes): The binary data to cache (hash + cubin).
-        """
-        raise NotImplementedError
-
-
-class DiskKernelCacheBackend(KernelCacheBackend):
-    """Disk-based kernel cache storage backend.
-
-    This backend stores compiled kernel binaries in a directory on disk.
-    """
-
-    def __init__(self, cache_dir: str | None = None):
-        """Initialize the disk cache backend.
-
-        Args:
-            cache_dir (str, optional): Directory to store cache files.
-                Defaults to CUPY_CACHE_DIR environment variable or
-                ~/.cupy/kernel_cache.
-        """
-        if cache_dir is None:
-            cache_dir = os.environ.get('CUPY_CACHE_DIR', _default_cache_dir)
-        self._cache_dir = cache_dir
-        if not os.path.isdir(self._cache_dir):
-            os.makedirs(self._cache_dir, exist_ok=True)
-
-    def load(self, name: str) -> bytes | None:
-        """Load a cached kernel binary from disk.
-
-        Args:
-            name (str): The cache key (filename) for the compiled kernel.
-
-        Returns:
-            bytes or None: The cached binary data if found and valid,
-                None otherwise.
-        """
-        path = os.path.join(self._cache_dir, name)
-        if not os.path.exists(path):
-            return None
-
-        with open(path, 'rb') as file:
-            data = file.read()
-
-        if len(data) < _hash_length:
-            return None
-
-        hash_stored = data[:_hash_length]
-        cubin = data[_hash_length:]
-        cubin_hash = _hash_hexdigest(cubin).encode('ascii')
-
-        if hash_stored != cubin_hash:
-            # Hash mismatch, corrupted cache
-            return None
-
-        return data
-
-    def save(self, name: str, data: bytes) -> None:
-        """Save a compiled kernel binary to disk.
-
-        Args:
-            name (str): The cache key (filename) for the compiled kernel.
-            data (bytes): The binary data to cache (hash + cubin).
-        """
-        path = os.path.join(self._cache_dir, name)
-
-        # Write to a temporary file and atomically replace
-        with tempfile.NamedTemporaryFile(
-                dir=self._cache_dir, delete=False) as tf:
-            tf.write(data)
-            temp_path = tf.name
-
-        try:
-            os.replace(temp_path, path)
-        except PermissionError:
-            # Windows may refuse to replace the file, assume this is a race
-            # and the existing file is OK (but keep using our copy)
-            pass
-
-    def save_source(self, name: str, source: str) -> None:
-        """Save the .cu source file along with the compiled binary.
-
-        Args:
-            name (str): The cache key (filename) for the compiled kernel.
-            source (str): The CUDA source code.
-        """
-        path = os.path.join(self._cache_dir, name)
-        with open(path + '.cu', 'w') as f:
-            f.write(source)
-
-    def get_cache_dir(self) -> str:
-        """Get the cache directory path.
-
-        Returns:
-            str: The cache directory path.
-        """
-        return self._cache_dir
-
-
-# Global kernel cache backend instance
-_kernel_cache_backend: KernelCacheBackend = DiskKernelCacheBackend()
-
-
-def _set_kernel_cache_backend(backend: KernelCacheBackend) -> None:
-    """Set the global kernel cache backend.
-    
-    This is a private API to allow programmatically changing the cache backend.
-    
-    Args:
-        backend: The kernel cache backend instance to use.
-    """
-    global _kernel_cache_backend
-    _kernel_cache_backend = backend
-
-
 def get_cache_dir():
     return os.environ.get('CUPY_CACHE_DIR', _default_cache_dir)
 
@@ -743,10 +606,8 @@ def _compile_with_cache_cuda(
         # Read from cache using global backend
         # We force recompiling to retrieve C++ mangled names if so desired.
         if not name_expressions:
-            data = _kernel_cache_backend.load(name)
-            if data is not None:
-                hash_stored = data[:_hash_length]
-                cubin = data[_hash_length:]
+            cubin = _kernel_cache_backend.load(name)
+            if cubin is not None:
                 if to_ltoir:
                     return cubin
                 else:
@@ -787,15 +648,7 @@ def _compile_with_cache_cuda(
 
     if not cache_in_memory:
         # Write to cache using global backend
-        cubin_hash = _hash_hexdigest(cubin).encode('ascii')
-        data = cubin_hash + cubin
-        _kernel_cache_backend.save(name, data)
-
-        # Save .cu source file along with .cubin
-        if _get_bool_env_variable('CUPY_CACHE_SAVE_CUDA_SOURCE', False):
-            # Use DiskKernelCacheBackend method if available
-            if isinstance(_kernel_cache_backend, DiskKernelCacheBackend):
-                _kernel_cache_backend.save_source(name, source)
+        _kernel_cache_backend.save(name, cubin, source)
     else:
         # we don't do any disk I/O
         pass
