@@ -87,6 +87,7 @@ class DiskKernelCacheBackend(KernelCacheBackend):
         self._cache_dir = cache_dir
         if not os.path.isdir(self._cache_dir):
             os.makedirs(self._cache_dir, exist_ok=True)
+        self._save_cuda_source = bool(os.environ.get('CUPY_CACHE_SAVE_CUDA_SOURCE'))
 
     def load(self, name: str) -> bytes | None:
         """Load a cached kernel binary from disk.
@@ -146,22 +147,6 @@ class DiskKernelCacheBackend(KernelCacheBackend):
             pass
 
         # Save .cu source file along with .cubin if requested
-        if os.environ.get('CUPY_CACHE_SAVE_CUDA_SOURCE'):
+        if self._save_cuda_source:
             with open(path + '.cu', 'w') as f:
                 f.write(source)
-
-
-# Global kernel cache backend instance
-_kernel_cache_backend: KernelCacheBackend = DiskKernelCacheBackend()
-
-
-def _set_kernel_cache_backend(backend: KernelCacheBackend) -> None:
-    """Set the global kernel cache backend.
-
-    This is a private API to allow programmatically changing the cache backend.
-
-    Args:
-        backend: The kernel cache backend instance to use.
-    """
-    global _kernel_cache_backend
-    _kernel_cache_backend = backend

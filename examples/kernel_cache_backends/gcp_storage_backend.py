@@ -44,11 +44,17 @@ from __future__ import annotations
 import os
 import warnings
 
-from google.cloud import storage
-from google.api_core import exceptions as gcp_exceptions
+try:
+    from google.cloud import storage
+    from google.api_core import exceptions as gcp_exceptions
+    _GCP_AVAILABLE = True
+except ImportError:
+    _GCP_AVAILABLE = False
+    storage = None  # type: ignore
+    gcp_exceptions = None  # type: ignore
 
 # Import the base class from cupy
-from cupy.cuda.compiler import DiskKernelCacheBackend
+from cupy.cuda._compiler_cache import DiskKernelCacheBackend
 
 
 class GCPStorageCacheBackend(DiskKernelCacheBackend):
@@ -92,6 +98,18 @@ class GCPStorageCacheBackend(DiskKernelCacheBackend):
 
         self.bucket_name = bucket_name
         self.prefix = prefix
+        self._gcp_enabled = False
+        self._bucket = None
+
+        if not _GCP_AVAILABLE:
+            warnings.warn(
+                "google-cloud-storage is not installed. "
+                "GCPStorageCacheBackend will only use local disk cache. "
+                "Install with: pip install google-cloud-storage",
+                RuntimeWarning
+            )
+            return
+
         self._gcp_enabled = True
 
         try:
@@ -168,16 +186,18 @@ class GCPStorageCacheBackend(DiskKernelCacheBackend):
                 super().save(name, cubin, '')
 
                 return cubin
-        except gcp_exceptions.GoogleAPIError as e:
-            warnings.warn(
-                f"Failed to download from GCS: {e}. Using local cache only.",
-                RuntimeWarning
-            )
         except Exception as e:
-            warnings.warn(
-                f"Unexpected error downloading from GCS: {e}",
-                RuntimeWarning
-            )
+            # Handle both GCP-specific errors and general exceptions
+            if _GCP_AVAILABLE and isinstance(e, gcp_exceptions.GoogleAPIError):
+                warnings.warn(
+                    f"Failed to download from GCS: {e}. Using local cache only.",
+                    RuntimeWarning
+                )
+            else:
+                warnings.warn(
+                    f"Error downloading from GCS: {e}",
+                    RuntimeWarning
+                )
 
         return None
 
@@ -210,13 +230,15 @@ class GCPStorageCacheBackend(DiskKernelCacheBackend):
 
             # Upload to GCS
             blob.upload_from_string(data)
-        except gcp_exceptions.GoogleAPIError as e:
-            warnings.warn(
-                f"Failed to upload to GCS: {e}. Kernel is cached locally only.",
-                RuntimeWarning
-            )
         except Exception as e:
-            warnings.warn(
-                f"Unexpected error uploading to GCS: {e}",
-                RuntimeWarning
-            )
+            # Handle both GCP-specific errors and general exceptions
+            if _GCP_AVAILABLE and isinstance(e, gcp_exceptions.GoogleAPIError):
+                warnings.warn(
+                    f"Failed to upload to GCS: {e}. Kernel is cached locally only.",
+                    RuntimeWarning
+                )
+            else:
+                warnings.warn(
+                    f"Error uploading to GCS: {e}",
+                    RuntimeWarning
+                )

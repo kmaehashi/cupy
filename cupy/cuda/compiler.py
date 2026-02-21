@@ -17,10 +17,8 @@ from cupy.cuda import device
 from cupy.cuda import function
 from cupy.cuda import get_rocm_path
 from cupy.cuda._compiler_cache import (
-    _kernel_cache_backend,
-    _set_kernel_cache_backend,
-    DiskKernelCacheBackend,
-    KernelCacheBackend,
+    DiskKernelCacheBackend as _DiskKernelCacheBackend,
+    KernelCacheBackend as _KernelCacheBackend,
 )
 from cupy_backends.cuda.api import driver
 from cupy_backends.cuda.api import runtime
@@ -36,6 +34,27 @@ _win32 = sys.platform.startswith('win32')
 _rdc_flags = ('--device-c', '-dc', '-rdc=true',
               '--relocatable-device-code=true')
 _cudadevrt = None
+
+
+# Global kernel cache backend instance
+_kernel_cache_backend: _KernelCacheBackend = _DiskKernelCacheBackend()
+
+
+def _set_kernel_cache_backend(backend: _KernelCacheBackend) -> None:
+    """Set the global kernel cache backend.
+
+    This is a private API to allow programmatically changing the cache backend.
+
+    Args:
+        backend: The kernel cache backend instance to use.
+    """
+    global _kernel_cache_backend
+    _kernel_cache_backend = backend
+
+
+# Re-export for backward compatibility and public API
+KernelCacheBackend = _KernelCacheBackend
+DiskKernelCacheBackend = _DiskKernelCacheBackend
 
 
 class NVCCException(Exception):
