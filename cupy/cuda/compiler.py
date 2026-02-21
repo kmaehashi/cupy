@@ -52,11 +52,6 @@ def _set_kernel_cache_backend(backend: _KernelCacheBackend) -> None:
     _kernel_cache_backend = backend
 
 
-# Re-export for backward compatibility and public API
-KernelCacheBackend = _KernelCacheBackend
-DiskKernelCacheBackend = _DiskKernelCacheBackend
-
-
 class NVCCException(Exception):
     pass
 

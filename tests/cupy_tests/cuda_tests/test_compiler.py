@@ -7,6 +7,7 @@ from unittest import mock
 
 import cupy
 from cupy.cuda import compiler
+from cupy.cuda._compiler_cache import DiskKernelCacheBackend, KernelCacheBackend
 
 
 def cuda_version():
@@ -151,7 +152,7 @@ class TestCacheBackend(unittest.TestCase):
         
         # Create a temporary directory for testing
         with tempfile.TemporaryDirectory() as tmpdir:
-            backend = compiler.DiskKernelCacheBackend(cache_dir=tmpdir)
+            backend = DiskKernelCacheBackend(cache_dir=tmpdir)
             
             # Test data
             name = 'test_kernel.cubin'
@@ -174,7 +175,7 @@ class TestCacheBackend(unittest.TestCase):
         import tempfile
         
         with tempfile.TemporaryDirectory() as tmpdir:
-            backend = compiler.DiskKernelCacheBackend(cache_dir=tmpdir)
+            backend = DiskKernelCacheBackend(cache_dir=tmpdir)
             
             # Try to load non-existent file
             result = backend.load('nonexistent.cubin')
@@ -186,7 +187,7 @@ class TestCacheBackend(unittest.TestCase):
         import os
         
         with tempfile.TemporaryDirectory() as tmpdir:
-            backend = compiler.DiskKernelCacheBackend(cache_dir=tmpdir)
+            backend = DiskKernelCacheBackend(cache_dir=tmpdir)
             
             name = 'test_kernel.cubin'
             # Create corrupted data (wrong hash)
@@ -206,7 +207,7 @@ class TestCacheBackend(unittest.TestCase):
         import tempfile
         
         with tempfile.TemporaryDirectory() as tmpdir:
-            backend = compiler.DiskKernelCacheBackend(cache_dir=tmpdir)
+            backend = DiskKernelCacheBackend(cache_dir=tmpdir)
             
             # Set the global backend
             original_backend = compiler._kernel_cache_backend
@@ -235,10 +236,10 @@ class TestCacheBackend(unittest.TestCase):
         """Test that KernelCacheBackend is an abstract interface."""
         # KernelCacheBackend is an ABC and should not be instantiable directly
         with self.assertRaises(TypeError):
-            compiler.KernelCacheBackend()
+            KernelCacheBackend()
         
         # Create a concrete implementation for testing
-        class TestBackend(compiler.KernelCacheBackend):
+        class TestBackend(KernelCacheBackend):
             def load(self, name):
                 return None
             

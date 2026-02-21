@@ -18,7 +18,7 @@ def example_disk_backend():
     """Example using the built-in disk cache backend."""
     print("\n=== Example 1: Disk Cache Backend ===")
     
-    from cupy.cuda.compiler import DiskKernelCacheBackend
+    from cupy.cuda._compiler_cache import DiskKernelCacheBackend
     import hashlib
     
     # Create a disk cache backend with a custom directory
@@ -100,7 +100,7 @@ def example_custom_backend():
     """Example implementing a simple in-memory cache backend."""
     print("\n=== Example 3: Custom In-Memory Cache Backend ===")
     
-    from cupy.cuda.compiler import KernelCacheBackend
+    from cupy.cuda._compiler_cache import KernelCacheBackend
     import hashlib
     
     class InMemoryCacheBackend(KernelCacheBackend):
@@ -137,7 +137,8 @@ def example_with_real_kernel():
     try:
         import cupy
         from cupy.cuda import compiler
-        from cupy.cuda.compiler import DiskKernelCacheBackend, _set_kernel_cache_backend
+        from cupy.cuda._compiler_cache import DiskKernelCacheBackend
+        from cupy.cuda.compiler import _set_kernel_cache_backend
     except ImportError as e:
         print(f"CuPy is not installed: {e}")
         return
