@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import os
 import tempfile
-import unittest
+
+import pytest
 
 from cupy.cuda._compiler_cache import (
     DiskKernelCacheBackend,
@@ -14,7 +15,7 @@ from cupy.cuda._compiler_cache import (
 )
 
 
-class TestHashFunction(unittest.TestCase):
+class TestHashFunction:
     """Tests for the hash utility function."""
 
     def test_hash_hexdigest(self):
@@ -23,32 +24,32 @@ class TestHashFunction(unittest.TestCase):
         expected_hash = hashlib.sha1(
             test_data, usedforsecurity=False).hexdigest()
         result = _hash_hexdigest(test_data)
-        self.assertEqual(result, expected_hash)
-        self.assertIsInstance(result, str)
+        assert result == expected_hash
+        assert isinstance(result, str)
 
     def test_hash_hexdigest_empty(self):
         """Test hash of empty bytes."""
         result = _hash_hexdigest(b'')
         expected = hashlib.sha1(b'', usedforsecurity=False).hexdigest()
-        self.assertEqual(result, expected)
+        assert result == expected
 
     def test_hash_length_constant(self):
         """Test that _hash_length is correct for SHA1 (40 hex chars)."""
-        self.assertEqual(_hash_length, 40)
+        assert _hash_length == 40
 
     def test_hash_hexdigest_length(self):
         """Test that hash output length matches _hash_length."""
         test_data = b'some random data for testing'
         result = _hash_hexdigest(test_data)
-        self.assertEqual(len(result), _hash_length)
+        assert len(result) == _hash_length
 
 
-class TestKernelCacheBackendInterface(unittest.TestCase):
+class TestKernelCacheBackendInterface:
     """Tests for KernelCacheBackend abstract base class."""
 
     def test_cannot_instantiate_abstract_class(self):
         """Test that KernelCacheBackend cannot be instantiated directly."""
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             KernelCacheBackend()
 
     def test_must_implement_load(self):
@@ -57,7 +58,7 @@ class TestKernelCacheBackendInterface(unittest.TestCase):
             def save(self, name: str, cubin: bytes, source: str) -> None:
                 pass
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             IncompleteBackend()
 
     def test_must_implement_save(self):
@@ -66,7 +67,7 @@ class TestKernelCacheBackendInterface(unittest.TestCase):
             def load(self, name: str) -> bytes | None:
                 return None
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             IncompleteBackend()
 
     def test_complete_implementation(self):
@@ -79,12 +80,12 @@ class TestKernelCacheBackendInterface(unittest.TestCase):
                 pass
 
         backend = CompleteBackend()
-        self.assertIsNotNone(backend)
-        self.assertIsNone(backend.load('test'))
+        assert backend is not None
+        assert backend.load('test') is None
         backend.save('test', b'data', 'source')  # Should not raise
 
 
-class TestDiskKernelCacheBackend(unittest.TestCase):
+class TestDiskKernelCacheBackend:
     """Tests for DiskKernelCacheBackend implementation."""
 
     def test_init_default_cache_dir(self):
@@ -97,8 +98,7 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
                 del os.environ['CUPY_CACHE_DIR']
 
             backend = DiskKernelCacheBackend()
-            self.assertTrue(
-                backend._cache_dir.endswith('.cupy/kernel_cache'))
+            assert backend._cache_dir.endswith('.cupy/kernel_cache')
         finally:
             # Restore original env var
             if original_env is not None:
@@ -109,8 +109,8 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             cache_dir = os.path.join(tmpdir, 'custom_cache')
             backend = DiskKernelCacheBackend(cache_dir=cache_dir)
-            self.assertEqual(backend._cache_dir, cache_dir)
-            self.assertTrue(os.path.isdir(cache_dir))
+            assert backend._cache_dir == cache_dir
+            assert os.path.isdir(cache_dir)
 
     def test_init_env_var_cache_dir(self):
         """Test initialization with CUPY_CACHE_DIR environment variable."""
@@ -121,8 +121,8 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
                 os.environ['CUPY_CACHE_DIR'] = env_cache_dir
 
                 backend = DiskKernelCacheBackend()
-                self.assertEqual(backend._cache_dir, env_cache_dir)
-                self.assertTrue(os.path.isdir(env_cache_dir))
+                assert backend._cache_dir == env_cache_dir
+                assert os.path.isdir(env_cache_dir)
         finally:
             if original_env is not None:
                 os.environ['CUPY_CACHE_DIR'] = original_env
@@ -143,7 +143,7 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
 
             # Load it back
             loaded_cubin = backend.load(name)
-            self.assertEqual(loaded_cubin, cubin)
+            assert loaded_cubin == cubin
 
     def test_load_nonexistent_file(self):
         """Test loading a file that doesn't exist."""
@@ -151,7 +151,7 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
             backend = DiskKernelCacheBackend(cache_dir=tmpdir)
 
             result = backend.load('nonexistent.cubin')
-            self.assertIsNone(result)
+            assert result is None
 
     def test_load_file_too_short(self):
         """Test loading a file that's too short to contain a hash."""
@@ -165,7 +165,7 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
                 f.write(b'too_short')
 
             result = backend.load(name)
-            self.assertIsNone(result)
+            assert result is None
 
     def test_load_corrupted_hash(self):
         """Test that corrupted cache files are rejected."""
@@ -183,7 +183,7 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
 
             # Load should return None due to hash mismatch
             result = backend.load(name)
-            self.assertIsNone(result)
+            assert result is None
 
     def test_save_creates_file_with_hash(self):
         """Test that save creates a file with hash prefix."""
@@ -202,17 +202,17 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
                 file_data = f.read()
 
             # Check that file contains hash + cubin
-            self.assertGreater(len(file_data), _hash_length)
+            assert len(file_data) > _hash_length
 
             stored_hash = file_data[:_hash_length]
             stored_cubin = file_data[_hash_length:]
 
             # Verify the stored cubin matches
-            self.assertEqual(stored_cubin, cubin)
+            assert stored_cubin == cubin
 
             # Verify the hash is correct
             expected_hash = _hash_hexdigest(cubin).encode('ascii')
-            self.assertEqual(stored_hash, expected_hash)
+            assert stored_hash == expected_hash
 
     def test_save_overwrites_existing_file(self):
         """Test that save overwrites an existing file."""
@@ -227,12 +227,12 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
             # Save first version
             backend.save(name, cubin1, source)
             loaded1 = backend.load(name)
-            self.assertEqual(loaded1, cubin1)
+            assert loaded1 == cubin1
 
             # Save second version (overwrite)
             backend.save(name, cubin2, source)
             loaded2 = backend.load(name)
-            self.assertEqual(loaded2, cubin2)
+            assert loaded2 == cubin2
 
     def test_save_source_file_when_env_var_set(self):
         """Test that .cu source file is saved when env var is set."""
@@ -251,12 +251,12 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
 
                 # Check that .cu file was created
                 cu_path = os.path.join(tmpdir, name + '.cu')
-                self.assertTrue(os.path.exists(cu_path))
+                assert os.path.exists(cu_path)
 
                 # Verify source content
                 with open(cu_path) as f:
                     saved_source = f.read()
-                self.assertEqual(saved_source, source)
+                assert saved_source == source
         finally:
             if original_env is not None:
                 os.environ['CUPY_CACHE_SAVE_CUDA_SOURCE'] = original_env
@@ -282,7 +282,7 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
 
                 # Check that .cu file was NOT created
                 cu_path = os.path.join(tmpdir, name + '.cu')
-                self.assertFalse(os.path.exists(cu_path))
+                assert not os.path.exists(cu_path)
         finally:
             if original_env is not None:
                 os.environ['CUPY_CACHE_SAVE_CUDA_SOURCE'] = original_env
@@ -305,7 +305,7 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
             # Load and verify each kernel
             for name, expected_cubin in kernels.items():
                 loaded_cubin = backend.load(name)
-                self.assertEqual(loaded_cubin, expected_cubin)
+                assert loaded_cubin == expected_cubin
 
     def test_save_empty_cubin(self):
         """Test saving and loading empty cubin data."""
@@ -318,7 +318,7 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
 
             backend.save(name, cubin, source)
             loaded = backend.load(name)
-            self.assertEqual(loaded, cubin)
+            assert loaded == cubin
 
     def test_save_large_cubin(self):
         """Test saving and loading large cubin data."""
@@ -332,8 +332,8 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
 
             backend.save(name, cubin, source)
             loaded = backend.load(name)
-            self.assertEqual(loaded, cubin)
-            self.assertEqual(len(loaded), len(cubin))
+            assert loaded == cubin
+            assert len(loaded) == len(cubin)
 
     def test_cache_dir_with_special_chars(self):
         """Test cache directory with special characters in name."""
@@ -341,26 +341,26 @@ class TestDiskKernelCacheBackend(unittest.TestCase):
             cache_dir = os.path.join(tmpdir, 'cache-dir_with.special@chars')
             backend = DiskKernelCacheBackend(cache_dir=cache_dir)
 
-            self.assertTrue(os.path.isdir(cache_dir))
+            assert os.path.isdir(cache_dir)
 
             name = 'test.cubin'
             cubin = b'data'
             backend.save(name, cubin, 'source')
             loaded = backend.load(name)
-            self.assertEqual(loaded, cubin)
+            assert loaded == cubin
 
 
-class TestDefaultCacheDir(unittest.TestCase):
+class TestDefaultCacheDir:
     """Tests for default cache directory constant."""
 
     def test_default_cache_dir_format(self):
         """Test that default cache dir has expected format."""
-        self.assertIn('.cupy', _default_cache_dir)
-        self.assertIn('kernel_cache', _default_cache_dir)
+        assert '.cupy' in _default_cache_dir
+        assert 'kernel_cache' in _default_cache_dir
 
     def test_default_cache_dir_expanded(self):
         """Test that default cache dir is expanded."""
         # Should not contain ~ after expansion
-        self.assertNotIn('~', _default_cache_dir)
+        assert '~' not in _default_cache_dir
         # Should be an absolute path
-        self.assertTrue(os.path.isabs(_default_cache_dir))
+        assert os.path.isabs(_default_cache_dir)
