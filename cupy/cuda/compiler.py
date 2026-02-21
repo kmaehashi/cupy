@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 import copy
 import hashlib
 import math
@@ -562,7 +561,7 @@ def _compile_with_cache_cuda(
         log_stream=None, cache_in_memory=False, jitify=False, to_ltoir=False):
     # NVRTC does not use extra_source. extra_source is used for cache key.
     global _empty_file_preprocess_cache
-    
+
     if cache_dir is None:
         cache_dir = get_cache_dir()
     if arch is None:

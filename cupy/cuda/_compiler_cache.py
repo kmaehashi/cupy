@@ -87,7 +87,8 @@ class DiskKernelCacheBackend(KernelCacheBackend):
         self._cache_dir = cache_dir
         if not os.path.isdir(self._cache_dir):
             os.makedirs(self._cache_dir, exist_ok=True)
-        self._save_cuda_source = bool(os.environ.get('CUPY_CACHE_SAVE_CUDA_SOURCE'))
+        self._save_cuda_source = bool(
+            os.environ.get('CUPY_CACHE_SAVE_CUDA_SOURCE'))
 
     def load(self, name: str) -> bytes | None:
         """Load a cached kernel binary from disk.

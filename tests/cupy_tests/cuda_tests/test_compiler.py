@@ -7,7 +7,9 @@ from unittest import mock
 
 import cupy
 from cupy.cuda import compiler
-from cupy.cuda._compiler_cache import DiskKernelCacheBackend, KernelCacheBackend
+from cupy.cuda._compiler_cache import (
+    DiskKernelCacheBackend, KernelCacheBackend
+)
 
 
 def cuda_version():
@@ -149,23 +151,23 @@ class TestCacheBackend(unittest.TestCase):
         """Test basic save and load operations."""
         import tempfile
         import os
-        
+
         # Create a temporary directory for testing
         with tempfile.TemporaryDirectory() as tmpdir:
             backend = DiskKernelCacheBackend(cache_dir=tmpdir)
-            
+
             # Test data
             name = 'test_kernel.cubin'
             cubin_data = b'kernel_binary_data'
             source = 'extern "C" __global__ void test() {}'
-            
+
             # Save data (now takes cubin and source)
             backend.save(name, cubin_data, source)
-            
+
             # Load data (now returns just cubin)
             loaded_data = backend.load(name)
             self.assertEqual(loaded_data, cubin_data)
-            
+
             # Verify file was created
             cache_path = os.path.join(tmpdir, name)
             self.assertTrue(os.path.exists(cache_path))
@@ -173,10 +175,10 @@ class TestCacheBackend(unittest.TestCase):
     def test_disk_cache_backend_load_nonexistent(self):
         """Test loading a non-existent cache entry."""
         import tempfile
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             backend = DiskKernelCacheBackend(cache_dir=tmpdir)
-            
+
             # Try to load non-existent file
             result = backend.load('nonexistent.cubin')
             self.assertIsNone(result)
@@ -185,19 +187,22 @@ class TestCacheBackend(unittest.TestCase):
         """Test that corrupted cache data is rejected."""
         import tempfile
         import os
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             backend = DiskKernelCacheBackend(cache_dir=tmpdir)
-            
+
             name = 'test_kernel.cubin'
             # Create corrupted data (wrong hash)
-            corrupted_data = b'wrong_hash_1234567890123456789012345678' + b'kernel_data'
-            
+            corrupted_data = (
+                b'wrong_hash_1234567890123456789012345678'
+                + b'kernel_data'
+            )
+
             # Write corrupted data directly to file
             cache_path = os.path.join(tmpdir, name)
             with open(cache_path, 'wb') as f:
                 f.write(corrupted_data)
-            
+
             # Load should return None due to hash mismatch
             result = backend.load(name)
             self.assertIsNone(result)
@@ -205,26 +210,26 @@ class TestCacheBackend(unittest.TestCase):
     def test_compile_with_custom_backend(self):
         """Test compilation with a custom cache backend."""
         import tempfile
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             backend = DiskKernelCacheBackend(cache_dir=tmpdir)
-            
+
             # Set the global backend
             original_backend = compiler._kernel_cache_backend
             compiler._set_kernel_cache_backend(backend)
-            
+
             try:
                 # Simple kernel source
                 source = '__device__ void test_func() {}'
-                
+
                 # First compilation - should create cache entry
                 result1 = compiler._compile_module_with_cache(source)
                 self.assertIsNotNone(result1)
-                
+
                 # Check that something was cached
                 cache_files = os.listdir(tmpdir)
                 self.assertGreater(len(cache_files), 0)
-                
+
                 # Second compilation - should use cache
                 result2 = compiler._compile_module_with_cache(source)
                 self.assertIsNotNone(result2)
@@ -237,15 +242,15 @@ class TestCacheBackend(unittest.TestCase):
         # KernelCacheBackend is an ABC and should not be instantiable directly
         with self.assertRaises(TypeError):
             KernelCacheBackend()
-        
+
         # Create a concrete implementation for testing
         class TestBackend(KernelCacheBackend):
             def load(self, name):
                 return None
-            
+
             def save(self, name, data):
                 pass
-        
+
         # Concrete implementation should be instantiable
         backend = TestBackend()
         self.assertIsNone(backend.load('test'))
