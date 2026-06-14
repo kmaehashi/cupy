@@ -1,0 +1,39 @@
+{
+"name": "CuPy Development",
+"build": {
+"dockerfile": "Dockerfile",
+"args": {
+"CUDA_VERSION": "13.0"
+}
+},
+"runArgs": [
+"--gpus=all",
+"--cap-add=SYS_PTRACE",
+"--security-opt=seccomp=unconfined"
+],
+"customizations": {
+"vscode": {
+"extensions": [
+"ms-python.python",
+"ms-python.vscode-pylance",
+"ms-python.black-formatter",
+"ms-toolsai.jupyter",
+"charliermarsh.ruff"
+],
+"settings": {
+"python.defaultInterpreterPath": "/usr/local/bin/python",
+"python.testing.pytestEnabled": true,
+"python.testing.unittestEnabled": false,
+"python.linting.enabled": true,
+"python.linting.ruffEnabled": true,
+"python.formatting.provider": "black",
+"editor.formatOnSave": true,
+"editor.rulers": [79],
+"files.trimTrailingWhitespace": true,
+"files.insertFinalNewline": true
+}
+}
+},
+"postCreateCommand": "pip install pre-commit && pre-commit install && pip install --no-build-isolation -e . && pip install pytest mock",
+"remoteUser": "cupy"
+}
