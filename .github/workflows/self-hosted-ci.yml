@@ -9,6 +9,9 @@ env:
   CI_REPO_OWNER: 'cupy'
   CI_REPO_NAME: 'self-hosted-ci'
 
+permissions:
+  pull-requests: read
+
 jobs:
   pre-dispatch:
     if: |

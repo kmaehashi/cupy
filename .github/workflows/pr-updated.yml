@@ -7,6 +7,9 @@ on:
   pull_request_review:
   pull_request_review_comment:
 
+permissions:
+  contents: read
+
 jobs:
   mark-needs-attention:
     if: |
