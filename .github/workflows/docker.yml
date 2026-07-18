@@ -17,9 +17,6 @@ on:
         description: "Pre-Release (do not push latest tag)"
         type: boolean
 
-permissions:
-  contents: read
-
 jobs:
   docker-build-push:
     if: |

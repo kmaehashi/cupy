@@ -2,13 +2,11 @@ name: "Pre-review Tests"
 
 on: [push, pull_request]
 
-permissions:
-  contents: read
-
 jobs:
   static-checks:
     runs-on: ubuntu-22.04
     permissions:
+      contents: read
       actions: write
 
     steps:
@@ -53,6 +51,7 @@ jobs:
   build-cuda:
     runs-on: ubuntu-22.04
     permissions:
+      contents: read
       actions: write
     env:
       CUPY_CI: GitHub

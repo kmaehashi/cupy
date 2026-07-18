@@ -5,9 +5,6 @@ on:
     workflows: ["Pull-Request Update"]
     types: [completed]
 
-permissions:
-  contents: read
-
 jobs:
   needs-attention:
     # Brings the pull-request to attention by any activities triggered by users other than assignees.
