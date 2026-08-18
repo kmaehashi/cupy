@@ -1,0 +1,107 @@
+name: "Branch Protection"
+run-name: "${{ inputs.action }} branch protection for ${{ inputs.branch }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        type: choice
+        options:
+          - enable
+          - disable
+      branch:
+        description: "Branch to update"
+        required: true
+        default: "main"
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: branch-protection-${{ inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update branch protection
+    if: >-
+      github.repository_owner == 'cupy' &&
+      github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # Restrict this environment to the default branch and require reviewers.
+    # Configure BRANCH_PROTECTION_APP_CLIENT_ID and BRANCH_PROTECTION_CONFIG as
+    # environment variables, and BRANCH_PROTECTION_APP_PRIVATE_KEY as a secret.
+    # Enabling reapplies the configured policy; disabling does not save it.
+    environment: branch-protection
+
+    steps:
+      - name: Mint branch-protection App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          client-id: ${{ vars.BRANCH_PROTECTION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BRANCH_PROTECTION_APP_PRIVATE_KEY }}
+          permission-administration: write
+
+      - name: Update branch protection
+        env:
+          BRANCH_PROTECTION_CONFIG: ${{ vars.BRANCH_PROTECTION_CONFIG }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PROTECTION_ACTION: ${{ inputs.action }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          encoded_branch="$(jq -rn --arg branch "${TARGET_BRANCH}" '$branch | @uri')"
+          branch_endpoint="repos/${GITHUB_REPOSITORY}/branches/${encoded_branch}"
+          api_headers=(
+            -H "Accept: application/vnd.github+json"
+            -H "X-GitHub-Api-Version: 2026-03-10"
+          )
+
+          # Check the branch separately so an unprotected branch can be
+          # distinguished from a branch that does not exist.
+          gh api "${branch_endpoint}" --silent "${api_headers[@]}"
+
+          case "${PROTECTION_ACTION}" in
+            enable)
+              if ! jq -e '
+                type == "object"
+                and has("required_status_checks")
+                and has("enforce_admins")
+                and has("required_pull_request_reviews")
+                and has("restrictions")
+              ' <<< "${BRANCH_PROTECTION_CONFIG}" >/dev/null; then
+                echo "::error::BRANCH_PROTECTION_CONFIG is not a valid branch protection policy"
+                exit 1
+              fi
+              gh api "${branch_endpoint}/protection" \
+                --method PUT \
+                --input - \
+                "${api_headers[@]}" \
+                <<< "${BRANCH_PROTECTION_CONFIG}" >/dev/null
+              ;;
+            disable)
+              if output="$(gh api "${branch_endpoint}/protection" \
+                  --method DELETE \
+                  "${api_headers[@]}" 2>&1)"; then
+                :
+              elif grep -q "HTTP 404" <<< "${output}"; then
+                echo "::notice::Branch protection is already disabled"
+              else
+                echo "${output}" >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unsupported action: ${PROTECTION_ACTION}"
+              exit 1
+              ;;
+          esac
+
+          echo "Branch protection action completed for ${TARGET_BRANCH}."
