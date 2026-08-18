@@ -35,7 +35,10 @@ jobs:
     # Restrict this environment to the default branch and require reviewers.
     # Configure BRANCH_PROTECTION_APP_CLIENT_ID and BRANCH_PROTECTION_CONFIG as
     # environment variables, and BRANCH_PROTECTION_APP_PRIVATE_KEY as a secret.
-    # Enabling reapplies the configured policy; disabling does not save it.
+    # The App needs Administration (write) and Contents (read) permissions.
+    # BRANCH_PROTECTION_CONFIG is the JSON body for the "Update branch
+    # protection" REST endpoint. Enabling reapplies it; disabling does not save
+    # the live policy.
     environment: branch-protection
 
     steps:
@@ -46,6 +49,7 @@ jobs:
           client-id: ${{ vars.BRANCH_PROTECTION_APP_CLIENT_ID }}
           private-key: ${{ secrets.BRANCH_PROTECTION_APP_PRIVATE_KEY }}
           permission-administration: write
+          permission-contents: read
 
       - name: Update branch protection
         env:
