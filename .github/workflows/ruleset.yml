@@ -9,15 +9,15 @@ on:
         required: true
         type: choice
         options:
-          - "Freeze Branch"
-          - "Unfreeze Branch"
+          - enable
+          - disable
       branch:
-        description: "Branch to update"
+        description: "Branch and ruleset to update"
         required: true
         type: choice
         options:
-          - main
-          - v14
+          - "main : rulesets/123"
+          - "v14 : rulesets/456"
 
 permissions: {}
 
@@ -52,29 +52,27 @@ jobs:
       - name: Update code freeze
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH_RULESET: ${{ inputs.branch }}
           RULESET_ACTION: ${{ inputs.action }}
-          RULESET_ID: "56524"
-          TARGET_BRANCH: ${{ inputs.branch }}
         shell: bash
         run: |
           set -euo pipefail
 
-          case "${TARGET_BRANCH}" in
-            main|v14)
-              target_ref="refs/heads/${TARGET_BRANCH}"
-              ;;
-            *)
-              echo "::error::Unsupported branch: ${TARGET_BRANCH}"
-              exit 1
-              ;;
-          esac
+          branch_ruleset_pattern='^(main|v14) : rulesets/([1-9][0-9]*)$'
+          if [[ "${BRANCH_RULESET}" =~ ${branch_ruleset_pattern} ]]; then
+            TARGET_BRANCH="${BASH_REMATCH[1]}"
+            RULESET_ID="${BASH_REMATCH[2]}"
+          else
+            echo "::error::Unsupported branch and ruleset: ${BRANCH_RULESET}"
+            exit 1
+          fi
 
           case "${RULESET_ACTION}" in
-            "Freeze Branch")
-              desired_state="frozen"
+            enable)
+              enforcement="active"
               ;;
-            "Unfreeze Branch")
-              desired_state="unfrozen"
+            disable)
+              enforcement="disabled"
               ;;
             *)
               echo "::error::Unsupported action: ${RULESET_ACTION}"
@@ -88,64 +86,25 @@ jobs:
             -H "X-GitHub-Api-Version: 2026-03-10"
           )
 
-          current_ruleset="$(
+          current_enforcement="$(
             gh api "${ruleset_endpoint}" \
+              --jq ".enforcement" \
               "${api_headers[@]}"
           )"
-
-          if ! jq -e '
-            .conditions.ref_name.include | type == "array"
-          ' <<< "${current_ruleset}" >/dev/null; then
-            echo "::error::Ruleset ${RULESET_ID} has invalid target branches"
-            exit 1
-          fi
-
-          case "${RULESET_ACTION}" in
-            "Freeze Branch")
-              updated_payload="$(
-                jq -c --arg ref "${target_ref}" '
-                  .conditions.ref_name.include |=
-                    if index($ref) == null then . + [$ref] else . end
-                  | {conditions: .conditions}
-                ' <<< "${current_ruleset}"
-              )"
-              ;;
-            "Unfreeze Branch")
-              updated_payload="$(
-                jq -c --arg ref "${target_ref}" '
-                  .conditions.ref_name.include |= map(select(. != $ref))
-                  | {conditions: .conditions}
-                ' <<< "${current_ruleset}"
-              )"
-              ;;
-          esac
-
-          current_conditions="$(jq -cS '.conditions' <<< "${current_ruleset}")"
-          updated_conditions="$(jq -cS '.conditions' <<< "${updated_payload}")"
-          if [[ "${current_conditions}" == "${updated_conditions}" ]]; then
-            echo "::notice::${TARGET_BRANCH} is already ${desired_state}"
+          if [[ "${current_enforcement}" == "${enforcement}" ]]; then
+            echo "::notice::Ruleset ${RULESET_ID} for ${TARGET_BRANCH} is already ${enforcement}"
           else
-            updated_ruleset="$(
+            updated_enforcement="$(
               gh api "${ruleset_endpoint}" \
                 --method PUT \
-                --input - \
-                "${api_headers[@]}" \
-                <<< "${updated_payload}"
+                -f "enforcement=${enforcement}" \
+                --jq ".enforcement" \
+                "${api_headers[@]}"
             )"
-
-            if [[ "${RULESET_ACTION}" == "Freeze Branch" ]] &&
-                ! jq -e --arg ref "${target_ref}" '
-                  .conditions.ref_name.include | index($ref) != null
-                ' <<< "${updated_ruleset}" >/dev/null; then
-              echo "::error::Failed to freeze ${TARGET_BRANCH}"
-              exit 1
-            elif [[ "${RULESET_ACTION}" == "Unfreeze Branch" ]] &&
-                ! jq -e --arg ref "${target_ref}" '
-                  .conditions.ref_name.include | index($ref) == null
-                ' <<< "${updated_ruleset}" >/dev/null; then
-              echo "::error::Failed to unfreeze ${TARGET_BRANCH}"
+            if [[ "${updated_enforcement}" != "${enforcement}" ]]; then
+              echo "::error::Ruleset ${RULESET_ID} for ${TARGET_BRANCH} has unexpected enforcement status: ${updated_enforcement}"
               exit 1
             fi
           fi
 
-          echo "${TARGET_BRANCH} is ${desired_state} by ruleset ${RULESET_ID}."
+          echo "Ruleset ${RULESET_ID} for ${TARGET_BRANCH} is ${enforcement}."
