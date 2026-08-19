@@ -88,7 +88,7 @@ def create_msg(issue, repo, tbp_issues, bp_issues, verbose):
 
         # If it's "takeover" PR, author cannot be determined automatically.
         if 'takeover' in label_names:
-            author = 'TAKEOVER (manually check original author: {})'.format(
+            author = '??? (manually check original author: {})'.format(
                 issue.html_url)
 
         # If it's "to-be-backported" PR, check the corresponding "backport" PR
