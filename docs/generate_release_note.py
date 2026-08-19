@@ -86,7 +86,7 @@ def create_msg(issue, repo, tbp_issues, bp_issues, verbose):
                         title))
                 err_msgs.append(err_msg)
 
-        # If it's "takeover" PR, author cannot be determined automatically.
+        # Use an invalid username for "takeover" PRs to avoid mentioning anyone.
         if 'takeover' in label_names:
             author = '??? (manually check original author: {})'.format(
                 issue.html_url)
