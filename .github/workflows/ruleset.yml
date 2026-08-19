@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          branch_ruleset_pattern='^(main|v14) : rulesets/([1-9][0-9]*)$'
+          branch_ruleset_pattern='^(.+) : rulesets/([1-9][0-9]*)$'
           if [[ "${BRANCH_RULESET}" =~ ${branch_ruleset_pattern} ]]; then
             TARGET_BRANCH="${BASH_REMATCH[1]}"
             RULESET_ID="${BASH_REMATCH[2]}"
