@@ -9,7 +9,7 @@ import os
 import sys
 import traceback
 
-from github import Github
+from github import Auth, Github
 
 
 CATEGORY_LABEL_TO_SECTION = {
@@ -137,7 +137,7 @@ if __name__ == '__main__':
         internal_members = [
             x for x in open(args.internal_members).read().splitlines() if x]
 
-    g = Github(args.token or os.environ['GITHUB_TOKEN'])
+    g = Github(auth=Auth.Token(args.token or os.environ['GITHUB_TOKEN']))
     org = g.get_organization(args.owner)
     repo = org.get_repo(args.repo)
     issues = get_issues(args.milestone, repo)
