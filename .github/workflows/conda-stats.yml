@@ -1,0 +1,112 @@
+name: "Conda Stats"
+run-name: >-
+  Conda Stats (${{
+    inputs.start-month != '' && inputs.start-month || 'auto'
+  }} - ${{
+    inputs.end-month != '' && inputs.end-month || 'auto'
+  }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      start-month:
+        description: "Start month in YYYY-MM format"
+        required: false
+        default: ""
+        type: string
+      end-month:
+        description: "End month in YYYY-MM format"
+        required: false
+        default: ""
+        type: string
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -xeuo pipefail {0}
+
+permissions:
+  contents: read
+
+jobs:
+  conda-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install condastats
+        run: python -m pip install --upgrade condastats
+
+      - name: Resolve month range
+        id: range
+        env:
+          INPUT_START_MONTH: ${{ inputs.start-month }}
+          INPUT_END_MONTH: ${{ inputs.end-month }}
+        run: |
+          validate_month() {
+            local month="$1"
+            if ! [[ "${month}" =~ ^[0-9]{4}-[0-9]{2}$ ]]; then
+              echo "::error::Invalid month format: ${month} (expected YYYY-MM)"
+              exit 1
+            fi
+            if ! date -u -d "${month}-01" '+%Y-%m' >/dev/null 2>&1; then
+              echo "::error::Invalid calendar month: ${month}"
+              exit 1
+            fi
+          }
+
+          month_add() {
+            date -u -d "${1}-01 ${2}" '+%Y-%m'
+          }
+
+          start_month="${INPUT_START_MONTH}"
+          end_month="${INPUT_END_MONTH}"
+
+          if [[ -n "${start_month}" ]]; then
+            validate_month "${start_month}"
+          fi
+          if [[ -n "${end_month}" ]]; then
+            validate_month "${end_month}"
+          fi
+
+          if [[ -z "${start_month}" && -z "${end_month}" ]]; then
+            end_month="$(date -u '+%Y-%m')"
+            start_month="$(month_add "${end_month}" '-2 months')"
+          elif [[ -z "${start_month}" ]]; then
+            start_month="$(month_add "${end_month}" '-2 months')"
+          elif [[ -z "${end_month}" ]]; then
+            end_month="$(month_add "${start_month}" '+2 months')"
+          fi
+
+          if [[ "$(date -u -d "${start_month}-01" '+%Y%m')" > "$(date -u -d "${end_month}-01" '+%Y%m')" ]]; then
+            echo "::error::start-month must be earlier than or equal to end-month"
+            exit 1
+          fi
+
+          {
+            echo "start-month=${start_month}"
+            echo "end-month=${end_month}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Show conda download statistics
+        env:
+          START_MONTH: ${{ steps.range.outputs.start-month }}
+          END_MONTH: ${{ steps.range.outputs.end-month }}
+        run: |
+          condastats overall --monthly cupy --start_month "${START_MONTH}" --end_month "${END_MONTH}" | tee stats.txt
+
+          {
+            echo "## CuPy conda download statistics"
+            echo
+            echo "- Start month: \`${START_MONTH}\`"
+            echo "- End month: \`${END_MONTH}\`"
+            echo
+            echo '```'
+            cat stats.txt
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
