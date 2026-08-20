@@ -1,9 +1,9 @@
 name: "Conda Stats"
 run-name: >-
   Conda Stats (${{
-    inputs.start-month != '' && inputs.start-month || 'auto'
+    inputs['start-month'] != '' && inputs['start-month'] || 'auto'
   }} - ${{
-    inputs.end-month != '' && inputs.end-month || 'auto'
+    inputs['end-month'] != '' && inputs['end-month'] || 'auto'
   }})
 
 on:
@@ -45,8 +45,8 @@ jobs:
       - name: Resolve month range
         id: range
         env:
-          INPUT_START_MONTH: ${{ inputs.start-month }}
-          INPUT_END_MONTH: ${{ inputs.end-month }}
+          INPUT_START_MONTH: ${{ inputs['start-month'] }}
+          INPUT_END_MONTH: ${{ inputs['end-month'] }}
         run: |
           validate_month() {
             local month="$1"
@@ -89,14 +89,14 @@ jobs:
           fi
 
           {
-            echo "start-month=${start_month}"
-            echo "end-month=${end_month}"
+            echo "start_month=${start_month}"
+            echo "end_month=${end_month}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Show conda download statistics
         env:
-          START_MONTH: ${{ steps.range.outputs.start-month }}
-          END_MONTH: ${{ steps.range.outputs.end-month }}
+          START_MONTH: ${{ steps.range.outputs.start_month }}
+          END_MONTH: ${{ steps.range.outputs.end_month }}
         run: |
           condastats overall --monthly cupy --start_month "${START_MONTH}" --end_month "${END_MONTH}" | tee stats.txt
 
